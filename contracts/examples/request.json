@@ -1,0 +1,9 @@
+{
+  "mode": "discover",
+  "query": "今晚想看轻松的电影，100分钟以内",
+  "region": "CN",
+  "session_id": "s0-demo",
+  "memory_enabled": false,
+  "clarification_count": 0,
+  "constraints": {"max_runtime_minutes": 100, "exclude_movie_ids": [], "exclude_genres": [], "preferred_tags": ["轻松"]}
+}

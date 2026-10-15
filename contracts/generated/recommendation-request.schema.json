@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "Constraints": {
+      "additionalProperties": false,
+      "properties": {
+        "max_runtime_minutes": {
+          "anyOf": [
+            {
+              "maximum": 600,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Runtime Minutes"
+        },
+        "exclude_movie_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 500,
+          "title": "Exclude Movie Ids",
+          "type": "array"
+        },
+        "exclude_genres": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Exclude Genres",
+          "type": "array"
+        },
+        "preferred_tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Preferred Tags",
+          "type": "array"
+        }
+      },
+      "title": "Constraints",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "enum": [
+        "discover",
+        "watchlist",
+        "known_movie"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "query": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Query",
+      "type": "string"
+    },
+    "region": {
+      "default": "CN",
+      "pattern": "^[A-Z]{2}$",
+      "title": "Region",
+      "type": "string"
+    },
+    "session_id": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "memory_enabled": {
+      "default": false,
+      "title": "Memory Enabled",
+      "type": "boolean"
+    },
+    "clarification_count": {
+      "default": 0,
+      "maximum": 2,
+      "minimum": 0,
+      "title": "Clarification Count",
+      "type": "integer"
+    },
+    "movie_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Movie Id"
+    },
+    "watchlist_movie_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 500,
+      "title": "Watchlist Movie Ids",
+      "type": "array"
+    },
+    "constraints": {
+      "$ref": "#/$defs/Constraints"
+    }
+  },
+  "required": [
+    "mode",
+    "query",
+    "session_id"
+  ],
+  "title": "RecommendationRequest",
+  "type": "object"
+}

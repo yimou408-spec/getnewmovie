@@ -1,0 +1,1 @@
+{"contract_version":"0.1.0","trace_id":"s0-degraded","data_mode":"synthetic","status":"degraded","candidates":[],"evidence":[],"questions":[],"warnings":["模拟场景：上游超时且没有可用缓存，本次不能提供可靠候选，请稍后重试。"],"memory_used":false}

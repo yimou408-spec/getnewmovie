@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>今晚看什么 · S0交互线框</title>
+<style>
+  :root{font:16px/1.6 system-ui,sans-serif;color:#e9edf5;background:#101722;color-scheme:dark}
+  body{max-width:1060px;margin:auto;padding:28px 20px}h1{margin:8px 0;font-size:34px}h2{font-size:21px}
+  .muted{color:#b1bfd1}.notice{border-left:3px solid #e9b55d;padding:10px 16px;background:#222837}
+  nav,.row{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}button,input,textarea,select{font:inherit;border:1px solid #526176;border-radius:7px;padding:10px;background:#182435;color:inherit}
+  button{cursor:pointer}button[aria-pressed=true],button.primary{background:#a9d8c8;color:#10251d;border-color:#a9d8c8}button:disabled{opacity:.5;cursor:wait}
+  textarea,input{box-sizing:border-box;width:100%}textarea{min-height:90px}label{display:block;margin:12px 0 6px}
+  .panel,.card{border:1px solid #34435a;padding:20px;border-radius:12px;margin:18px 0;background:#151f2e}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}.grid .card{margin:0}
+  table{border-collapse:collapse;width:100%}td,th{padding:12px;text-align:left;border-bottom:1px solid #34435a}a{color:#a9d8c8}
+  .small{font-size:14px}input[type=checkbox]{width:auto}#message{white-space:pre-wrap}summary{cursor:pointer}
+</style>
+<body>
+<p class="muted small">MOVIE AGENT / 交互线框 v0.1</p>
+<h1>给今晚留一部好电影</h1>
+<p class="muted">说说你现在想看什么，或从已经收藏的电影中做选择。</p>
+<p class="notice">S0离线模拟。所有影片、评分、来源均为虚构；输入不参与真实推荐，反馈和记忆不会保存。</p>
+<nav aria-label="选片入口">
+  <button data-mode="discover" aria-pressed="true">不知道看什么</button>
+  <button data-mode="watchlist" aria-pressed="false">从我的片单选</button>
+  <button data-mode="known_movie" aria-pressed="false">已知道片名</button>
+</nav>
+<section class="panel">
+  <label for="query" id="query-label">这一次想看什么？</label>
+  <textarea id="query">今晚想看轻松的电影，100分钟以内</textarea>
+  <p id="mode-help" class="muted small">可描述题材、心情或时间限制。</p>
+  <div class="row">
+    <div><label for="scenario">联调状态</label><select id="scenario"><option value="success">成功卡片</option><option value="empty">无匹配</option><option value="clarification">需要澄清</option><option value="degraded">服务降级</option><option value="timeout">上游超时</option><option value="unconfigured">未配置数据源</option></select></div>
+    <div><label for="region">观看地区</label><select id="region"><option value="CN">中国大陆</option><option value="JP">日本</option></select></div>
+  </div>
+  <label><input type="checkbox" disabled> 记住我的偏好（S3接入，本阶段未启用）</label>
+  <p><button id="submit" class="primary">查看模拟结果</button> <a href="/docs">查看接口文档</a></p>
+</section>
+<section aria-live="polite"><p id="message" class="muted">等待输入。可通过“联调状态”检查空态和错误反馈。</p><div id="results" class="grid"></div></section>
+<section class="panel"><h2>同屏对比线框</h2><p class="muted small">两部虚构影片演示字段差异；缺失不等于评分低。</p><div style="overflow:auto"><table><tr><th>维度</th><th>春日来信（2024）</th><th>远星航线（2022）</th></tr><tr><td>时长</td><td>95分钟</td><td>99分钟</td></tr><tr><td>类型</td><td>剧情 / 校园</td><td>科幻 / 太空</td></tr><tr><td>评分</td><td>模拟评分7.2/10 · 100票</td><td>未取得</td></tr><tr><td>中国大陆渠道</td><td>未知</td><td>未知</td></tr></table></div></section>
+<details><summary>联调响应 JSON</summary><pre id="raw" style="white-space:pre-wrap;overflow-wrap:anywhere">尚无请求</pre></details>
+<script>
+let mode='discover';
+const $=id=>document.getElementById(id);
+document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{
+  mode=button.dataset.mode;
+  document.querySelectorAll('[data-mode]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+  $('query-label').textContent=mode==='watchlist'?'粘贴片名，每行一部':mode==='known_movie'?'输入电影名和年份':'这一次想看什么？';
+  $('mode-help').textContent=mode==='watchlist'?'S0固定使用两部合成片作为已确认片单；文本导入与消歧后续实现。':mode==='known_movie'?'输入片名后执行合成库检索；同名不同年需选择确认。':'可描述题材、心情或时间限制。';
+  $('query').value=mode==='known_movie'?'春日来信':mode==='watchlist'?'春日来信 2024\n远星航线 2022':'今晚想看轻松的电影，100分钟以内';
+}));
+function paragraph(parent,text){const p=document.createElement('p');p.textContent=text;parent.append(p);return p;}
+function movieCard(movie){const card=document.createElement('article');card.className='card';const title=document.createElement('h2');title.textContent=`${movie.title}（${movie.year??'年份未知'}）`;card.append(title);paragraph(card,`${movie.runtime_minutes??'未知'} 分钟 · ${movie.genres.join(' / ')}`);return card;}
+async function request(url,options){const response=await fetch(url,options);const data=await response.json();$('raw').textContent=JSON.stringify(data,null,2);if(!response.ok)throw new Error(data.message||'请求校验失败，请查看接口响应。');return data;}
+$('submit').addEventListener('click',async()=>{
+  $('results').replaceChildren();$('message').textContent='正在读取模拟数据…';$('submit').disabled=true;
+  try{
+    if(mode==='known_movie'){
+      const data=await request('/movies?query='+encodeURIComponent($('query').value.trim()),{});
+      $('message').textContent=data.requires_confirmation?'发现同名影片，请确认年份（此处仅演示消歧状态）。':data.movies.length?'找到合成影片。':'合成库中未找到该影片。';
+      data.movies.forEach(movie=>$('results').append(movieCard(movie)));return;
+    }
+    const data=await request('/recommendations',{method:'POST',headers:{'Content-Type':'application/json','X-Mock-Scenario':$('scenario').value},body:JSON.stringify({mode,query:$('query').value,region:$('region').value,session_id:'s0-wireframe',memory_enabled:false,clarification_count:0,watchlist_movie_ids:mode==='watchlist'?['syn:letter-2024','syn:orbit']:[],constraints:{}})});
+    $('message').textContent=data.warnings.join('\n');
+    if($('region').value!=='CN')$('message').textContent+='\n此固定fixture使用CN渠道状态，不是所选地区的真实结果。';
+    data.questions.forEach(question=>{const card=document.createElement('div');card.className='card';paragraph(card,question.text);paragraph(card,'选项：'+question.options.join(' / ')+'（S0仅展示）');$('results').append(card);});
+    data.candidates.forEach(item=>{const card=movieCard(item.movie);paragraph(card,item.reason.text);paragraph(card,'需要注意：'+item.caveats.join('；'));paragraph(card,'渠道：未知');paragraph(card,'来源：S0合成数据，非真实评分');const feedback=document.createElement('button');feedback.textContent='今天不想看';feedback.onclick=()=>{feedback.textContent='已在本页隐藏（未保存）';card.style.opacity='.5';};card.append(feedback);$('results').append(card);});
+  }catch(error){$('message').textContent=error.message;}finally{$('submit').disabled=false;}
+});
+</script>
+</body></html>

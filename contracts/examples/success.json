@@ -1,0 +1,19 @@
+{
+  "contract_version": "0.1.0",
+  "trace_id": "s0-success",
+  "data_mode": "synthetic",
+  "status": "ready",
+  "candidates": [
+    {
+      "movie": {"movie_id": "syn:letter-2024", "title": "春日来信", "year": 2024, "runtime_minutes": 95, "countries": ["CN"], "genres": ["剧情"], "tags": ["轻松", "校园"], "ratings": [{"source": "S0合成数据", "value": 7.2, "scale": 10, "vote_count": 100, "evidence_id": "syn:e1"}]},
+      "reason": {"text": "模拟资料标记为轻松，片长95分钟，符合本次时长要求。", "evidence_ids": ["syn:e1"], "kind": "matching_inference"},
+      "caveats": ["虚构影片，仅供接口与交互联调。"],
+      "uncertain_conditions": ["真实观看渠道未验证"],
+      "availability": [{"region": "CN", "status": "unknown", "provider": null, "offer_type": "unknown", "url": null, "checked_at": null}]
+    }
+  ],
+  "evidence": [{"evidence_id": "syn:e1", "movie_id": "syn:letter-2024", "source": "S0合成数据", "url": "https://example.invalid/s0/letter-2024", "retrieved_at": "2026-10-15T00:00:00Z", "kind": "synthetic", "claim": "虚构影片：95分钟，轻松、校园；模拟评分7.2/10，100票。", "spoiler_level": "safe"}],
+  "questions": [],
+  "warnings": ["离线模拟：影片、评分和来源均为合成，不代表真实推荐结果。"],
+  "memory_used": false
+}

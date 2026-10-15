@@ -1,0 +1,1 @@
+{"contract_version":"0.1.0","trace_id":"s0-clarification","data_mode":"synthetic","status":"needs_clarification","candidates":[],"evidence":[],"questions":[{"question_id":"viewing-context","text":"这次想在家看还是去影院？","options":["在家","影院","都可以"]}],"warnings":["模拟场景：此处只演示澄清界面，不执行自然语言推理。"],"memory_used":false}

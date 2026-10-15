@@ -1,0 +1,6 @@
+# S0-only environment; Python 3.11+.
+fastapi==0.135.3
+pydantic==2.12.4
+httpx==0.28.1
+pytest==8.4.2
+uvicorn==0.44.0

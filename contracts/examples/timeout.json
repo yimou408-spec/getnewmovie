@@ -1,0 +1,1 @@
+{"contract_version":"0.1.0","trace_id":"s0-timeout","data_mode":"synthetic","code":"UPSTREAM_TIMEOUT","message":"模拟上游超时；未取得足够数据。","retryable":true}

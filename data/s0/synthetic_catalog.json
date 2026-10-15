@@ -1,0 +1,6 @@
+[
+  {"movie_id":"syn:letter-2024","title":"春日来信","year":2024,"runtime_minutes":95,"countries":["CN"],"genres":["剧情"],"tags":["轻松","校园"],"ratings":[]},
+  {"movie_id":"syn:letter-1998","title":"春日来信","year":1998,"runtime_minutes":121,"countries":["JP"],"genres":["爱情"],"tags":["慢节奏"],"ratings":[]},
+  {"movie_id":"syn:orbit","title":"远星航线","year":2022,"runtime_minutes":99,"countries":["CN"],"genres":["科幻"],"tags":["太空"],"ratings":[]},
+  {"movie_id":"syn:unknown","title":"未完成的片长","year":2023,"runtime_minutes":null,"countries":["CN"],"genres":["剧情"],"tags":[],"ratings":[]}
+]

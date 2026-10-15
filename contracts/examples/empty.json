@@ -1,0 +1,1 @@
+{"contract_version":"0.1.0","trace_id":"s0-empty","data_mode":"synthetic","status":"empty","candidates":[],"evidence":[],"questions":[],"warnings":["模拟场景：没有符合全部硬约束的电影。可以自行调整时长或题材后重试，系统未自动放宽。"],"memory_used":false}

@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "0.1.0",
+      "default": "0.1.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "data_mode": {
+      "enum": [
+        "synthetic",
+        "live",
+        "cached"
+      ],
+      "title": "Data Mode",
+      "type": "string"
+    },
+    "code": {
+      "enum": [
+        "UPSTREAM_TIMEOUT",
+        "NOT_CONFIGURED",
+        "NOT_FOUND",
+        "INVALID_SCENARIO"
+      ],
+      "title": "Code",
+      "type": "string"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "retryable": {
+      "title": "Retryable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "trace_id",
+    "data_mode",
+    "code",
+    "message",
+    "retryable"
+  ],
+  "title": "ErrorResponse",
+  "type": "object"
+}

@@ -1,0 +1,449 @@
+{
+  "$defs": {
+    "Availability": {
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "pattern": "^[A-Z]{2}$",
+          "title": "Region",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "unknown",
+            "stale",
+            "listed",
+            "search_entry"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "offer_type": {
+          "default": "unknown",
+          "enum": [
+            "cinema",
+            "subscription",
+            "rent",
+            "buy",
+            "free",
+            "unknown"
+          ],
+          "title": "Offer Type",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "checked_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checked At"
+        }
+      },
+      "required": [
+        "region",
+        "status"
+      ],
+      "title": "Availability",
+      "type": "object"
+    },
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "movie": {
+          "$ref": "#/$defs/Movie"
+        },
+        "reason": {
+          "$ref": "#/$defs/Reason"
+        },
+        "caveats": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Caveats",
+          "type": "array"
+        },
+        "uncertain_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Uncertain Conditions",
+          "type": "array"
+        },
+        "availability": {
+          "items": {
+            "$ref": "#/$defs/Availability"
+          },
+          "minItems": 1,
+          "title": "Availability",
+          "type": "array"
+        }
+      },
+      "required": [
+        "movie",
+        "reason",
+        "availability"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "movie_id": {
+          "title": "Movie Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "metadata",
+            "review",
+            "rating",
+            "synthetic"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "claim": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Claim",
+          "type": "string"
+        },
+        "spoiler_level": {
+          "enum": [
+            "safe",
+            "unknown",
+            "contains_spoilers"
+          ],
+          "title": "Spoiler Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "movie_id",
+        "source",
+        "url",
+        "retrieved_at",
+        "kind",
+        "claim",
+        "spoiler_level"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Movie": {
+      "additionalProperties": false,
+      "properties": {
+        "movie_id": {
+          "pattern": "^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*)$",
+          "title": "Movie Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "year": {
+          "anyOf": [
+            {
+              "maximum": 2200,
+              "minimum": 1888,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Year"
+        },
+        "runtime_minutes": {
+          "anyOf": [
+            {
+              "maximum": 600,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime Minutes"
+        },
+        "countries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Countries",
+          "type": "array"
+        },
+        "genres": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Genres",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "ratings": {
+          "items": {
+            "$ref": "#/$defs/Rating"
+          },
+          "title": "Ratings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "movie_id",
+        "title"
+      ],
+      "title": "Movie",
+      "type": "object"
+    },
+    "Question": {
+      "additionalProperties": false,
+      "properties": {
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5,
+          "title": "Options",
+          "type": "array"
+        }
+      },
+      "required": [
+        "question_id",
+        "text"
+      ],
+      "title": "Question",
+      "type": "object"
+    },
+    "Rating": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "minimum": 0,
+          "title": "Value",
+          "type": "number"
+        },
+        "scale": {
+          "exclusiveMinimum": 0,
+          "title": "Scale",
+          "type": "number"
+        },
+        "vote_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vote Count"
+        },
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "value",
+        "scale",
+        "evidence_id"
+      ],
+      "title": "Rating",
+      "type": "object"
+    },
+    "Reason": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "metadata_fact",
+            "source_opinion",
+            "matching_inference"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "evidence_ids",
+        "kind"
+      ],
+      "title": "Reason",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "0.1.0",
+      "default": "0.1.0",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "trace_id": {
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "data_mode": {
+      "enum": [
+        "synthetic",
+        "live",
+        "cached"
+      ],
+      "title": "Data Mode",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "empty",
+        "needs_clarification",
+        "degraded"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/Candidate"
+      },
+      "maxItems": 3,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/Question"
+      },
+      "maxItems": 2,
+      "title": "Questions",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "memory_used": {
+      "title": "Memory Used",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "trace_id",
+    "data_mode",
+    "status",
+    "candidates",
+    "evidence",
+    "questions",
+    "warnings",
+    "memory_used"
+  ],
+  "title": "RecommendationResponse",
+  "type": "object"
+}
