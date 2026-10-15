@@ -40,4 +40,4 @@ History uses messages such as `docs: add three-person development plan and TDD s
 
 ## Configuration & Data Handling
 
-Use `.env.example` as a variable reference; scripts do not automatically load `.env`. Keep secrets and reports under ignored paths. Live probes require `--live` and explicit environment configuration. Preserve synthetic labels and pending-review status; do not represent fixtures as verified movie data or upload raw interview material.
+Keep all `.env` and `.env.*` files local and untracked, including `.env.example`; scripts do not automatically load `.env`. Consult `docs/s0/README.md` for variable names. Keep secrets and reports under ignored paths. Live probes require `--live` and explicit environment configuration. Preserve synthetic labels and pending-review status; do not represent fixtures as verified movie data or upload raw interview material.

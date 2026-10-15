@@ -38,7 +38,7 @@ python -m uvicorn scripts.s0_mock_server:app --host 127.0.0.1 --port 8000
 
 ## 真实实验
 
-`.env.example`提供环境变量名称。脚本**不自动读取.env**，可在终端设置环境变量；Key只通过环境传入，不作为命令行参数、日志或报告内容。不要把密钥值写进提交。缺少配置返回退出码2且不请求网络。
+环境变量文件（包括`.env.example`）仅保留本地，由Git忽略，不上传仓库。所需变量名：TMDB使用`TMDB_READ_TOKEN`及可选的`WATCH_REGION`（默认CN）；模型使用`LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。脚本**不自动读取.env**，可在终端设置环境变量；Key只通过环境传入，不作为命令行参数、日志或报告内容。不要把密钥值写进提交。缺少配置返回退出码2且不请求网络。
 
 TMDB默认只查3个样本、最多8次HTTP请求；搜索与详情各算一次，失败也占预算，不自动重试：
 
