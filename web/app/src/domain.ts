@@ -61,6 +61,27 @@ export function safeSourceUrl(value: string | null | undefined): string | null {
   }
 }
 
+export type DiscoverPreferences = {
+  moods: string[];
+  genres: string[];
+  company: string;
+};
+
+export function discoverQuery(
+  preferences: DiscoverPreferences,
+  note: string,
+): string {
+  const parts = [
+    preferences.moods.length ? `心情：${preferences.moods.join("、")}` : "",
+    preferences.genres.length ? `类型：${preferences.genres.join("、")}` : "",
+    preferences.company ? `一起看的人：${preferences.company}` : "",
+    note.trim() ? `补充：${note.trim()}` : "",
+  ].filter(Boolean);
+  return parts.length
+    ? parts.join("；")
+    : "什么都行，没有特别偏好，直接给我一些电影候选。";
+}
+
 export function buildRequest(
   mode: Mode,
   query: string,
@@ -69,6 +90,7 @@ export function buildRequest(
   saved: string[],
   selected?: Movie,
   clarificationCount = 0,
+  preferredTags: string[] = [],
 ): Request {
   if (mode === "known_movie" && !selected)
     throw new Error("请先查找并确认影片及年份。");
@@ -94,7 +116,7 @@ export function buildRequest(
       max_runtime_minutes: runtime ? Number(runtime) : null,
       exclude_movie_ids: [],
       exclude_genres: [],
-      preferred_tags: [],
+      preferred_tags: preferredTags,
     },
   };
   if (!requestValid(request))

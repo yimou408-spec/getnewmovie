@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { safeSourceUrl, validateResponse, buildRequest } from "./domain";
+import {
+  safeSourceUrl,
+  validateResponse,
+  buildRequest,
+  discoverQuery,
+} from "./domain";
 import success from "../../../contracts/examples/success.json";
 describe("truthful contract boundary", () => {
+  it("allows discovery without typing and preserves selected preferences", () => {
+    const empty = discoverQuery({ moods: [], genres: [], company: "" }, "");
+    expect(buildRequest("discover", empty, "CN", "", []).query).toBeTruthy();
+    const query = discoverQuery(
+      { moods: ["轻松解压"], genres: ["科幻", "喜剧"], company: "两个人" },
+      "不要恐怖",
+    );
+    expect(query).toContain("轻松解压");
+    expect(query).toContain("科幻、喜剧");
+    expect(query).toContain("两个人");
+    expect(query).toContain("不要恐怖");
+  });
+  it("offers three distinct synthetic previews without claiming personalization", () => {
+    expect(success.candidates).toHaveLength(3);
+    expect(new Set(success.candidates.map((c) => c.movie.movie_id)).size).toBe(
+      3,
+    );
+    expect(success.warnings.join("")).toContain("固定");
+  });
   it("accepts the shared fixture but rejects unsupported versions and unsafe evidence", () => {
     expect(validateResponse(success).data_mode).toBe("synthetic");
     expect(() =>
