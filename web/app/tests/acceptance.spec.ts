@@ -22,7 +22,7 @@ test("select, inspect sources, save, compare and privacy through real S0 API", a
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "今晚，想看点什么？" }),
+    page.getByRole("heading", { name: /今晚，\s*想看点什么？/ }),
   ).toBeVisible();
   await noOverflow(page);
   await accessible(page);
@@ -183,12 +183,12 @@ test("theme reacts immediately, keyboard entry works, and navigation never loses
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("body")).toHaveCSS(
     "background-color",
-    "rgb(23, 26, 32)",
+    "rgb(20, 27, 37)",
   );
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("body")).toHaveCSS(
     "background-color",
-    "rgb(246, 247, 249)",
+    "rgb(245, 246, 248)",
   );
   await page.getByRole("link", { name: "关于与数据说明" }).click();
   await accessible(page);
@@ -198,5 +198,57 @@ test("theme reacts immediately, keyboard entry works, and navigation never loses
     "不丢失的草稿",
   );
   await page.setViewportSize({ width: 320, height: 720 });
+  await noOverflow(page);
+});
+
+test("cinema artwork, wide layout and mood shortcuts remain usable", async ({
+  page,
+  isMobile,
+}, testInfo) => {
+  await page.goto("/");
+  const artwork = page.getByRole("img", { name: /暖色车厢/ });
+  await expect(artwork).toBeVisible();
+  await expect
+    .poll(() =>
+      artwork.evaluate((img) => (img as HTMLImageElement).naturalWidth),
+    )
+    .toBe(2200);
+  if (!isMobile) {
+    for (const width of [1920, 2560]) {
+      await page.setViewportSize({ width, height: 1080 });
+      await noOverflow(page);
+      const hero = await page.locator(".intro").boundingBox();
+      expect(hero!.width).toBeGreaterThan(width * 0.65);
+      await expect(
+        page.getByRole("button", { name: "开始今晚的选片" }),
+      ).toBeInViewport();
+      await page.screenshot({
+        path: `${screenshots}/${testInfo.project.name}-${width}.png`,
+      });
+    }
+  } else {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await noOverflow(page);
+    await page.screenshot({
+      path: `${screenshots}/${testInfo.project.name}-320.png`,
+      fullPage: true,
+    });
+  }
+  await page.getByRole("button", { name: "开始今晚的选片" }).click();
+  await expect(page.getByLabel("说说这次的观影想法")).toBeFocused();
+  await expect(page.getByLabel("说说这次的观影想法")).toBeInViewport();
+  await page.getByRole("tab", { name: "已知道片名" }).click();
+  await page.getByRole("button", { name: /松弛一点/ }).click();
+  await expect(page.getByRole("tab", { name: "不知道看什么" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByLabel("说说这次的观影想法")).toHaveValue(
+    "想轻松一下，100 分钟以内",
+  );
+  await expect(page.getByLabel("说说这次的观影想法")).toBeFocused();
+  await expect(page.getByLabel("最多看多久")).toHaveValue("100");
+  await page.getByRole("button", { name: "看看候选电影" }).click();
+  await expect(page.getByRole("heading", { name: "春日来信" })).toBeVisible();
   await noOverflow(page);
 });

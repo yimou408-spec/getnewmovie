@@ -35,6 +35,9 @@ import {
   CircleAlert,
   ExternalLink,
   Monitor,
+  Moon,
+  Heart,
+  Telescope,
 } from "lucide-react";
 import {
   api,
@@ -475,7 +478,7 @@ export default function App() {
       <main
         id="main"
         tabIndex={-1}
-        className={comparison.length ? "with-tray" : ""}
+        className={`${comparison.length ? "with-tray" : ""} ${location.pathname === "/" ? "home-page" : ""}`}
       >
         <Routes>
           <Route
@@ -483,22 +486,45 @@ export default function App() {
             element={
               <>
                 <section className="intro">
-                  <div>
+                  <img
+                    className="intro-image"
+                    src="/images/coastal-train.webp"
+                    alt="暖色车厢里，海岸风景从宽大的车窗外缓缓展开"
+                    width={2200}
+                    height={1237}
+                    fetchPriority="high"
+                  />
+                  <div className="intro-copy">
                     <p className="intro-note">
-                      <span className="line" />
-                      给自己留一场电影的时间
+                      私人选片室 · 给自己留一点电影时间
                     </p>
-                    <h1>今晚，想看点什么？</h1>
-                    <p>
-                      从此刻的心情出发。少一点犹豫，多一点好好看电影的时间。
+                    <h1>
+                      今晚，
+                      <br />
+                      想看点什么？
+                    </h1>
+                    <p className="intro-description">
+                      暂停日常，走进另一个故事。
+                      <br />
+                      从此刻的心情出发，找到今晚想看的那一部。
                     </p>
+                    <button
+                      className="hero-action"
+                      onClick={() => textareaRef.current?.focus()}
+                    >
+                      开始今晚的选片 <ArrowRight size={20} aria-hidden="true" />
+                    </button>
                   </div>
-                  <div className="ticket" aria-hidden="true">
-                    <span className="ticket-perf" />
-                    <Clapperboard size={38} />
-                    <span>留给今晚</span>
-                    <small>一部就好</small>
-                    <span className="ticket-stub">电影时间</span>
+                  <div className="hero-caption">
+                    <span>让生活慢下来，让故事开始。</span>
+                    <a
+                      href="https://unsplash.com/photos/JCqY2Ji5gj4"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      氛围摄影 · Shawn Rain / Unsplash{" "}
+                      <ExternalLink size={12} aria-hidden="true" />
+                    </a>
                   </div>
                 </section>
                 <div className="workspace">
@@ -506,9 +532,10 @@ export default function App() {
                     className="composer"
                     aria-labelledby="composer-title"
                   >
-                    <h2 id="composer-title" className="sr-only">
-                      开始选片
-                    </h2>
+                    <div className="composer-heading">
+                      <h2 id="composer-title">把今晚，交给一个好故事</h2>
+                      <p>不必先想好片名，说说你想怎么度过这段时间。</p>
+                    </div>
                     <Tabs.Root
                       value={mode}
                       onValueChange={(v) => {
@@ -585,7 +612,7 @@ export default function App() {
                               }
                               placeholder="比如：下班后想放松一下，轻松、有点幽默，100 分钟以内。"
                               maxLength={2000}
-                              rows={4}
+                              rows={3}
                               required
                               aria-describedby="mood-help"
                             />
@@ -681,9 +708,9 @@ export default function App() {
                   <aside className="inspiration">
                     <div className="aside-heading">
                       <Sparkles size={19} aria-hidden="true" />
-                      <h2>还没有头绪？</h2>
+                      <h2>从一个念头开始</h2>
                     </div>
-                    <p>从一个小小的念头开始。</p>
+                    <p>选一种心情，试着打开今晚。</p>
                     <div className="idea-list">
                       {ideas.map((idea, i) => (
                         <button
@@ -695,9 +722,20 @@ export default function App() {
                               discover: idea,
                             }));
                             if (i === 0) setRuntime("100");
-                            textareaRef.current?.focus();
+                            requestAnimationFrame(() =>
+                              textareaRef.current?.focus(),
+                            );
                           }}
                         >
+                          <span className="idea-icon" aria-hidden="true">
+                            {i === 0 ? (
+                              <Moon size={23} />
+                            ) : i === 1 ? (
+                              <Heart size={23} />
+                            ) : (
+                              <Telescope size={23} />
+                            )}
+                          </span>
                           <span>
                             {["松弛一点", "一起看", "换个世界"][i]}
                             <small>{idea}</small>

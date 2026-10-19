@@ -4,7 +4,7 @@
 
 ## 设计与功能
 
-产品暂名“今晚看什么 · 私人选片室”。围绕“说出想法 → 核对少量候选 → 查看理由与来源 → 保存或对比”组织页面，避免信息流式堆叠。采用中文系统字体、克制的紫色强调、票根元素和清楚的表单层级；没有授权海报时使用明确的文字占位。
+产品暂名“今晚看什么 · 私人选片室”。围绕“说出想法 → 核对少量候选 → 查看理由与来源 → 保存或对比”组织页面。采用宽幅海岸列车摄影、36–80px 大标题、瓷白/墨蓝底色及琥珀操作色；主视觉之后是选片表单与心情快捷入口。桌面内容区最大 1800px，手机独立排版，320px 下约束字段改为单列。没有授权电影海报时使用明确的文字占位。[视觉方案](visual-redesign.md)与[摄影来源及许可证](assets.md)均随仓库交付。
 
 - 选片：不知道看什么、从本次片单选、已知道片名三个入口，保留各自草稿；支持地区与时长约束。
 - 确认：同名作品展示年份与资料，用户确认后才提交 `movie_id`。
@@ -88,7 +88,7 @@ GitHub Actions 的前端工作流安装 Playwright Chromium，在 Linux 上执�
 
 ## 实际验收
 
-验收日期：2026-10-19。本机 Windows、Google Chrome 155.0.8059.80，桌面 1440×1000、手机视口 390×844，另检查 320px 窄宽度。手机验收使用真实 Chrome 的移动视口与触控模拟，未声称完成实体 iPhone/Android 或 Safari 验收。
+验收日期：2026-10-19。本机 Windows、Google Chrome 155.0.8059.80，桌面 1440×1000，另检查 1920×1080 和 2560×1080；手机视口 390×844，另检查 320×720。手机验收使用真实 Chrome 的移动视口与触控模拟，未声称完成实体 iPhone/Android 或 Safari 验收。
 
 | 环境 | 核心工作流 | 服务状态及身份确认 | 系统主题与键盘 | 网络失败与会话边界 |
 | --- | --- | --- | --- | --- |
@@ -99,22 +99,26 @@ GitHub Actions 的前端工作流安装 Playwright Chromium，在 Linux 上执�
 
 核心工作流包括实际 HTTP 推荐、请求参数、核对来源、片单、真实对比接口、清空与撤销。自动检查文档无横向溢出；axe 在首页、候选、对比及关于页检查 WCAG 2/2.1/2.2 A/AA 相关规则。自动规则通过不等于完整的人工读屏或合规认证。
 
-最终本地结果：16 项浏览器验收、3 项前端单元测试、30 项原有后端测试全部通过；生产构建、生成类型一致性、格式和差异检查通过。后端测试有一条原有 Starlette/httpx 弃用提示，无测试失败。生产构建的三个 JavaScript 分包约为 39.8 / 134.8 / 331.7 kB（未压缩）；尚未做线上性能测量。
+最终本地结果：20 项浏览器验收、3 项前端单元测试、30 项原有后端测试全部通过；生产构建、生成类型一致性、格式和差异检查通过。新增宽屏空间利用、摄影加载、首屏操作定位输入框，以及从其他选片方式切回心情快捷入口的验证。后端测试有一条原有 Starlette/httpx 弃用提示，无测试失败。生产构建的三个 JavaScript 分包约为 40.7 / 134.8 / 332.5 kB（未压缩）；尚未做线上性能测量。
 
 单元测试覆盖响应契约、安全来源、已确认身份、时长与禁用记忆。测试先建立失败用例（实现模块不存在），再完成实现并通过。后端保留原 S0 契约回归。
 
-截图目录为 [`screenshots/`](screenshots/)，包含旧线框基线与四种环境的首页、候选、对比。截图来自端到端测试当前运行，可复现，不是静态设计稿。
+截图目录为 [`screenshots/`](screenshots/)，包含旧线框基线与 18 张最终验收截图：四种环境的首页、候选、对比，1920/2560 宽屏明暗主题，以及 320px 手机明暗主题。截图来自端到端测试当前运行，可复现，不是静态设计稿。人工复核了桌面与手机的构图、表单、候选和比较视图，并修正了 320px 标签换行和地区选择过窄的问题。
 
 | 截图 | 浅色 | 深色 |
 | --- | --- | --- |
 | 桌面首页 | [查看](screenshots/desktop-light-home.png) | [查看](screenshots/desktop-dark-home.png) |
+| 1920 宽屏 | [查看](screenshots/desktop-light-1920.png) | [查看](screenshots/desktop-dark-1920.png) |
+| 2560 宽屏 | [查看](screenshots/desktop-light-2560.png) | [查看](screenshots/desktop-dark-2560.png) |
+| 手机首页 | [查看](screenshots/mobile-light-home.png) | [查看](screenshots/mobile-dark-home.png) |
+| 320 窄屏 | [查看](screenshots/mobile-light-320.png) | [查看](screenshots/mobile-dark-320.png) |
 | 手机候选 | [查看](screenshots/mobile-light-result.png) | [查看](screenshots/mobile-dark-result.png) |
 | 手机对比 | [查看](screenshots/mobile-light-compare.png) | [查看](screenshots/mobile-dark-compare.png) |
 
 ## 本次使用的 skills
 
 - `software-product-frontend`：产品层级、真实状态、组件复用和 Chrome 验收。
-- `frontend-design`：视觉方向、排版、票根语言与响应式设计。
+- `frontend-design`：影像优先的视觉方向、大屏构图、排版和响应式设计。
 - `web-design-guidelines`：基于当前官方规则复核表单、焦点、交互与可访问性。
 - `vercel-react-best-practices`：React 状态、请求、依赖与构建检查。
 - `webapp-testing`：Playwright 工作流、截图、异常路径及浏览器回归。
