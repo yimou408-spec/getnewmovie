@@ -16,3 +16,19 @@ python -m uvicorn scripts.s0_mock_server:app --host 127.0.0.1 --port 8000
 ```
 
 原型：`http://127.0.0.1:8000/`；接口文档：`http://127.0.0.1:8000/docs`。
+
+## 产品前端
+
+新的响应式前端位于 `web/app`，支持选片、同名影片确认、本次片单、影片资料、对比、偏好与隐私说明。浅色与深色外观自动跟随系统。
+
+需要 Python 3.11+、Node.js 24 与 npm。在上面的 Mock 服务保持运行时，另开终端：
+
+```powershell
+cd web/app
+npm ci
+npm run dev
+```
+
+打开 `http://127.0.0.1:5173/`。这是连接真实 S0 HTTP 接口的合成数据联调版；推荐模型、真实电影数据、账号、云端片单及长期记忆尚未实现。旧线框入口仍保留。
+
+[前端设计、接入边界、部署与验收记录](docs/frontend/README.md)
