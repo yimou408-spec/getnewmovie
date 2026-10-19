@@ -4,7 +4,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 45000,
+  timeout: 90000,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:5173",
@@ -42,7 +42,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `${process.env.PYTHON || "python"} -m uvicorn scripts.s0_mock_server:app --host 127.0.0.1 --port 8000`,
+      command: `${process.env.PYTHON || "python"} -m uvicorn scripts.movie_server:app --host 127.0.0.1 --port 8000`,
       cwd: "../..",
       url: "http://127.0.0.1:8000/docs",
       reuseExistingServer: !process.env.CI,

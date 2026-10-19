@@ -188,7 +188,7 @@
       "additionalProperties": false,
       "properties": {
         "movie_id": {
-          "pattern": "^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*)$",
+          "pattern": "^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*|itunes:[1-9][0-9]*)$",
           "title": "Movie Id",
           "type": "string"
         },
@@ -251,6 +251,60 @@
           },
           "title": "Ratings",
           "type": "array"
+        },
+        "poster_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Poster Url"
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Url"
+        },
+        "director": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Director"
+        },
+        "content_advisory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Advisory"
         }
       },
       "required": [
@@ -432,6 +486,32 @@
     "memory_used": {
       "title": "Memory Used",
       "type": "boolean"
+    },
+    "catalog_size": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Catalog Size"
+    },
+    "matched_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Matched Count"
     }
   },
   "required": [

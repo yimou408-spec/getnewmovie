@@ -26,84 +26,109 @@ async function noOverflow(page: Page) {
     ),
   ).toBe(true);
 }
-async function optionalNote(page: Page, value: string) {
-  const note = page.getByLabel("说说这次的观影想法");
-  if (!(await note.isVisible()))
-    await page
-      .getByText("补充文字、精确时长或地区（可选）", { exact: true })
-      .click();
-  await note.fill(value);
-}
-
 async function accessible(page: Page) {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
 }
-
-test("select, inspect sources, save, compare and privacy through real S0 API", async ({
+async function submit(page: Page, name: string | RegExp = "看看候选电影") {
+  const response = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/recommendations") &&
+      r.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name, exact: typeof name === "string" })
+    .click();
+  const r = await response;
+  expect(r.status()).toBe(200);
+  const data = await r.json();
+  expect(["live", "cached"]).toContain(data.data_mode);
+  expect(
+    data.candidates.every(
+      (c: any) =>
+        c.movie.movie_id.startsWith("itunes:") && c.movie.ratings.length === 0,
+    ),
+  ).toBe(true);
+  await expect(page.locator(".candidate-grid > article")).toHaveCount(
+    data.candidates.length,
+  );
+  return data;
+}
+test.beforeEach(async ({ page }) => {
+  expect(
+    (await (await page.request.get("http://127.0.0.1:8000/health")).json())
+      .synthetic_fallback,
+  ).toBe(false);
+  await page.goto("/");
+});
+test("real catalog, artwork, sources, watchlist and comparison", async ({
   page,
-}, testInfo) => {
+}, info) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: /今晚，\s*想看点什么？/ }),
-  ).toBeVisible();
-  await noOverflow(page);
   await accessible(page);
+  await noOverflow(page);
   await page.screenshot({
-    path: `${screenshots}/${testInfo.project.name}-home.png`,
+    path: `${screenshots}/${info.project.name}-home.png`,
     fullPage: true,
   });
-  await optionalNote(page, "轻松的电影，100 分钟以内");
-  await page.getByLabel("最多看多久").fill("100");
-  const request = page.waitForRequest(
-    (r) => r.url().endsWith("/api/recommendations") && r.method() === "POST",
-  );
-  await page.getByRole("button", { name: "看看候选电影" }).click();
-  const body = (await request).postDataJSON();
-  expect(body.memory_enabled).toBe(false);
-  expect(body.constraints.max_runtime_minutes).toBe(100);
-  await expect(page.getByRole("heading", { name: "春日来信" })).toBeVisible();
-  await expect(page.getByText("观看渠道未知", { exact: false })).toHaveCount(3);
+  const data = await submit(page, "什么都行，直接看看");
+  expect(data.catalog_size).toBeGreaterThan(3);
+  expect(data.candidates).toHaveLength(3);
+  for (const img of await page.locator(".candidate-grid .poster img").all()) {
+    await img.scrollIntoViewIfNeeded();
+    await expect
+      .poll(
+        () =>
+          img.evaluate(
+            (el: HTMLImageElement) => el.complete && el.naturalWidth > 0,
+          ),
+        { timeout: 20000 },
+      )
+      .toBe(true);
+  }
+  expect(await page.locator(".candidate-grid .store-badge").count()).toBe(3);
   await page.getByText("核对理由与来源", { exact: true }).first().click();
   await expect(
-    page.getByText("查看来源（暂无可访问链接）").first(),
-  ).toBeVisible();
-  expect(await page.locator('a[href*=".invalid"]').count()).toBe(0);
-  await noOverflow(page);
+    page.locator('.candidate-grid a[href*="itunes.apple.com"]').first(),
+  ).toHaveAttribute("href", /^https:\/\/itunes.apple.com\//);
   await accessible(page);
+  await noOverflow(page);
+  await page.locator(".intro").scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: `${screenshots}/${testInfo.project.name}-result.png`,
+    path: `${screenshots}/${info.project.name}-result.png`,
     fullPage: true,
+  });
+  await page.locator(".candidate-grid").scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-result-viewport.png`,
   });
   await page
     .getByRole("button", { name: "加入本次片单", exact: true })
     .first()
     .click();
-  await page.getByRole("checkbox", { name: "对比 春日来信 2024" }).check();
-  await page.getByRole("link", { name: /本次片单/ }).click();
-  await page.getByLabel("影片名称").fill("远星航线");
-  await page.getByRole("button", { name: "查找影片" }).click();
-  await expect(
-    page.getByText("远星航线（2022）", { exact: true }),
-  ).toBeVisible();
-  await page
-    .locator(".lookup-item")
-    .getByRole("button", { name: "加入本次片单" })
-    .click();
-  await page.getByRole("checkbox", { name: "对比 远星航线 2022" }).check();
-  await page.getByRole("link", { name: "开始对比" }).click();
+  const checks = page.locator(".candidate-grid").getByRole("checkbox");
+  await checks.nth(0).check();
+  await checks.nth(1).check();
+  await page.getByRole("link", { name: "开始对比", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "影片对比表，可左右滚动" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "95 分钟" })).toBeVisible();
-  await noOverflow(page);
+  for (const c of data.candidates.slice(0, 2))
+    await expect(
+      page.getByRole("columnheader", {
+        name: new RegExp(c.movie.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      }),
+    ).toBeVisible();
   await accessible(page);
+  await noOverflow(page);
   await page.screenshot({
-    path: `${screenshots}/${testInfo.project.name}-compare.png`,
+    path: `${screenshots}/${info.project.name}-compare.png`,
     fullPage: true,
   });
   await page.getByRole("link", { name: "偏好与隐私", exact: true }).click();
@@ -112,238 +137,214 @@ test("select, inspect sources, save, compare and privacy through real S0 API", a
   ).toBeDisabled();
   await page.getByRole("button", { name: "清空本次片单与对比" }).click();
   await expect(page.locator(".compare-tray")).toHaveCount(0);
-  await page.getByRole("button", { name: "撤销", exact: true }).click();
-  await expect(page.locator(".compare-tray")).toContainText("已选 2/3 部");
-  await page.getByRole("button", { name: "清空本次片单与对比" }).click();
-  await page.getByRole("link", { name: "选片", exact: true }).click();
-  await expect(page.getByLabel("说说这次的观影想法")).toHaveValue(
-    "轻松的电影，100 分钟以内",
-  );
   expect(errors).toEqual([]);
 });
-
-test("ambiguous identity, unknown film and all service states remain truthful", async ({
+test("mood, genre and duration change real candidates; empty is honest", async ({
+  page,
+}, info) => {
+  await page
+    .getByRole("group", { name: "想要什么感觉？" })
+    .getByRole("button", { name: "轻松解压", exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "想看哪种故事？" })
+    .getByRole("button", { name: "喜剧", exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "今晚有多少时间？" })
+    .getByRole("button", { name: "90 分钟内", exact: true })
+    .click();
+  const comedy = await submit(page, "看看候选电影");
+  expect(comedy.candidates.length).toBeGreaterThan(0);
+  for (const c of comedy.candidates) {
+    expect(c.movie.genres).toContain("喜剧");
+    expect(c.movie.runtime_minutes).toBeLessThanOrEqual(90);
+    expect(c.movie.runtime_minutes).toBeGreaterThan(0);
+  }
+  await noOverflow(page);
+  await accessible(page);
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-choices.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "清空选择", exact: true }).click();
+  await page
+    .getByRole("group", { name: "想要什么感觉？" })
+    .getByRole("button", { name: "感动一下", exact: true })
+    .click();
+  const drama = await submit(page, "看看候选电影");
+  expect(drama.candidates.length).toBeGreaterThan(0);
+  expect(drama.candidates.map((c: any) => c.movie.movie_id)).not.toEqual(
+    comedy.candidates.map((c: any) => c.movie.movie_id),
+  );
+  for (const c of drama.candidates) expect(c.movie.genres).toContain("剧情");
+  await page
+    .getByRole("group", { name: "想看哪种故事？" })
+    .getByRole("button", { name: "恐怖", exact: true })
+    .click();
+  const empty = await submit(page, "看看候选电影");
+  expect(empty.status).toBe("empty");
+  await expect(
+    page.getByRole("heading", { name: "这次还没有合适的候选" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "清空筛选条件" }).click();
+  expect((await submit(page)).candidates.length).toBe(3);
+  const previous = await page.locator(".candidate-grid h3").allTextContents();
+  await submit(page, "换一组真实电影");
+  expect(
+    await page.locator(".candidate-grid h3").allTextContents(),
+  ).not.toEqual(previous);
+});
+test("era, ranking choice and session exclusions survive a fresh submission", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "已知道片名" }).click();
-  await page.getByLabel("影片名称").fill("春日来信");
-  await page.getByRole("button", { name: "查找影片" }).click();
-  await expect(page.getByText("找到同名影片，请确认具体年份。")).toBeVisible();
-  await expect(page.getByRole("button", { name: "确认这部" })).toHaveCount(2);
-  await page
-    .locator(".lookup-item")
-    .filter({ hasText: "1998" })
-    .getByRole("button", { name: "确认这部" })
-    .click();
-  await expect(page.getByText("已确认：春日来信（1998）")).toBeVisible();
-  await page
-    .getByLabel("关于这部电影，你在意什么？")
-    .fill("判断这部电影是否适合今晚");
-  const knownRequest = page.waitForRequest(
+  const ordering = page.getByRole("group", { name: "怎么安排候选？" });
+  await ordering.getByRole("button", { name: "榜单顺序", exact: true }).click();
+  const request = page.waitForRequest(
     (r) => r.url().endsWith("/api/recommendations") && r.method() === "POST",
   );
-  await page.getByRole("button", { name: "看看候选电影" }).click();
-  expect((await knownRequest).postDataJSON().movie_id).toBe("syn:letter-1998");
-  await expect(page.getByRole("heading", { name: "春日来信" })).toBeVisible();
-  await page.getByRole("tab", { name: "不知道看什么" }).click();
-  await optionalNote(page, "今晚想看电影");
-  await page.getByText("联调场景设置", { exact: true }).click();
-  for (const [scenario, text] of [
-    ["empty", "这次还没有合适的候选"],
-    ["degraded", "推荐服务暂时降级"],
-    ["clarification", "再补充一点想法"],
-    ["timeout", "推荐服务响应超时，可以重试。"],
-    ["unconfigured", "推荐服务尚未配置，请稍后再试。"],
-  ]) {
-    await page.getByLabel("模拟服务状态").selectOption(scenario);
-    await page.getByRole("button", { name: "看看候选电影" }).click();
-    await expect(page.getByText(text, { exact: true })).toBeVisible();
-    await noOverflow(page);
-  }
-  await expect(page.getByLabel("说说这次的观影想法")).toHaveValue(
-    "今晚想看电影",
-  );
-  await page.goto("/film/syn%3Adoes-not-exist");
-  await expect(page.getByRole("alert")).toContainText("没有找到这部影片");
-  await page.goto("/unknown");
+  const first = await submit(page);
+  expect((await request).postDataJSON().constraints.sort_by).toBe("popular");
+  const rejected = first.candidates[0].movie.movie_id;
+  await page
+    .locator(".candidate-grid > article")
+    .first()
+    .getByRole("button", { name: "这次不想看", exact: true })
+    .click();
   await expect(
-    page.getByRole("heading", { name: "这一页还没有开场" }),
+    page.getByRole("button", { name: "撤销本次排除", exact: true }),
   ).toBeVisible();
+  await ordering.getByRole("button", { name: "均衡探索", exact: true }).click();
+  const retry = page.waitForRequest(
+    (r) => r.url().endsWith("/api/recommendations") && r.method() === "POST",
+  );
+  const second = await submit(page);
+  expect((await retry).postDataJSON().constraints).toMatchObject({
+    sort_by: "balanced",
+    exclude_movie_ids: [rejected],
+  });
+  expect(second.candidates.map((c: any) => c.movie.movie_id)).not.toContain(
+    rejected,
+  );
+  await page.getByRole("button", { name: "撤销本次排除", exact: true }).click();
+  const group = page.getByRole("group", { name: "想看哪个年代？" });
+  await group.getByRole("button", { name: "2000 年以前", exact: true }).click();
+  const classic = await submit(page);
+  expect(classic.candidates.length).toBeGreaterThan(0);
+  expect(classic.candidates.every((c: any) => c.movie.year < 2000)).toBe(true);
+  await noOverflow(page);
+  await accessible(page);
 });
-
-test("failed and malformed responses retain the last result and session data clears on reload", async ({
+test("real identity lookup, known film, watchlist and reload boundary", async ({
   page,
 }) => {
-  await page.goto("/");
-  await optionalNote(page, "今晚想看一部轻松的电影");
-  await page.getByRole("button", { name: "看看候选电影" }).click();
-  await expect(page.getByRole("heading", { name: "春日来信" })).toBeVisible();
+  const data = await submit(page);
+  const film = data.candidates[0].movie;
+  await page.getByRole("tab", { name: "已知道片名", exact: true }).click();
+  await page.getByLabel("影片名称", { exact: true }).fill(film.title);
+  const response = page.waitForResponse(
+    (r) => r.url().includes("/api/movies?") && r.request().method() === "GET",
+  );
+  await page.getByRole("button", { name: "查找影片", exact: true }).click();
+  expect((await response).status()).toBe(200);
+  await page
+    .locator(".lookup-item")
+    .filter({ hasText: film.title })
+    .getByRole("button", { name: "确认这部", exact: true })
+    .first()
+    .click();
+  const known = await submit(page, "看看候选电影");
+  expect(known.candidates[0].movie.movie_id).toBe(film.movie_id);
   await page
     .getByRole("button", { name: "加入本次片单", exact: true })
     .first()
     .click();
-  await page.route("**/api/recommendations", (route) => route.abort("failed"));
-  await page.getByRole("button", { name: "看看候选电影" }).click();
-  await expect(page.getByRole("alert")).toContainText("连接失败");
-  await expect(page.getByRole("heading", { name: "春日来信" })).toBeVisible();
-  await page.unroute("**/api/recommendations");
-  await page.route("**/api/recommendations", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ status: "ready", candidates: [] }),
-    }),
-  );
-  await page.getByRole("button", { name: "看看候选电影" }).click();
-  await expect(page.getByRole("alert")).toContainText("接口约定不一致");
-  await expect(page.getByRole("heading", { name: "春日来信" })).toBeVisible();
+  await page.getByRole("tab", { name: "从片单中选", exact: true }).click();
+  const saved = await submit(page, "看看候选电影");
+  expect(saved.candidates.map((c: any) => c.movie.movie_id)).toEqual([
+    film.movie_id,
+  ]);
   await page.reload();
   await page.getByRole("link", { name: /本次片单/ }).click();
   await expect(
-    page.getByRole("heading", { name: "第一部，留给你想看的" }),
-  ).toBeVisible();
-  await noOverflow(page);
+    page.getByRole("button", { name: "移出本次片单", exact: true }),
+  ).toHaveCount(0);
 });
-
-test("theme reacts immediately, keyboard entry works, and navigation never loses draft", async ({
+test("failed or invalid source response preserves real results; poster failure is visible", async ({
   page,
 }) => {
-  await page.goto("/");
+  const data = await submit(page);
+  const title = data.candidates[0].movie.title;
+  await page.route("**/api/recommendations", (r) => r.abort("failed"));
+  await page.getByRole("button", { name: "看看候选电影", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("连接失败");
+  await expect(
+    page.getByRole("heading", { name: title, exact: true }),
+  ).toBeVisible();
+  await page.unroute("**/api/recommendations");
+  await page.route("**/api/recommendations", (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: '{"status":"ready","candidates":[]}',
+    }),
+  );
+  await page.getByRole("button", { name: "看看候选电影", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("接口约定不一致");
+  await expect(
+    page.getByRole("heading", { name: title, exact: true }),
+  ).toBeVisible();
+  await page.unroute("**/api/recommendations");
+  await page.route("**/*.mzstatic.com/**", (r) => r.abort());
+  await page.reload();
+  await submit(page);
+  for (const poster of await page.locator(".candidate-grid .poster").all())
+    await poster.scrollIntoViewIfNeeded();
+  await expect(page.getByText("海报加载失败", { exact: true })).toHaveCount(3);
+});
+test("system theme changes immediately, keyboard focus and narrow layout", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  const light = await page
+    .locator("body")
+    .evaluate((e) => getComputedStyle(e).backgroundColor);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect
+    .poll(() =>
+      page.locator("body").evaluate((e) => getComputedStyle(e).backgroundColor),
+    )
+    .not.toBe(light);
+  await page.emulateMedia({
+    colorScheme: info.project.name.includes("dark") ? "dark" : "light",
+  });
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "跳到主要内容" })).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.locator("main")).toBeFocused();
-  await optionalNote(page, "不丢失的草稿");
-  await page.emulateMedia({ colorScheme: "dark" });
-  await expect(page.locator("body")).toHaveCSS(
-    "background-color",
-    "rgb(20, 27, 37)",
+  await submit(page);
+  await page.setViewportSize(
+    info.project.name.startsWith("mobile")
+      ? { width: 320, height: 720 }
+      : { width: 1920, height: 1080 },
   );
-  await page.emulateMedia({ colorScheme: "light" });
-  await expect(page.locator("body")).toHaveCSS(
-    "background-color",
-    "rgb(245, 246, 248)",
-  );
-  await page.getByRole("link", { name: "关于与数据说明" }).click();
+  await noOverflow(page);
   await accessible(page);
-  await noOverflow(page);
-  await page.getByRole("link", { name: "选片", exact: true }).click();
-  await expect(page.getByLabel("说说这次的观影想法")).toHaveValue(
-    "不丢失的草稿",
-  );
-  await page.setViewportSize({ width: 320, height: 720 });
-  await noOverflow(page);
-});
-
-test("cinema artwork, wide layout and mood shortcuts remain usable", async ({
-  page,
-  isMobile,
-}, testInfo) => {
-  await page.goto("/");
-  const artwork = page.getByRole("img", { name: /暖色车厢/ });
-  await expect(artwork).toBeVisible();
-  await expect
-    .poll(() =>
-      artwork.evaluate((img) => (img as HTMLImageElement).naturalWidth),
-    )
-    .toBe(2200);
-  if (!isMobile) {
-    for (const width of [1920, 2560]) {
-      await page.setViewportSize({ width, height: 1080 });
-      await noOverflow(page);
-      const hero = await page.locator(".intro").boundingBox();
-      expect(hero!.width).toBeGreaterThan(width * 0.65);
-      await expect(
-        page.getByRole("button", { name: "开始今晚的选片" }),
-      ).toBeInViewport();
-      await page.screenshot({
-        path: `${screenshots}/${testInfo.project.name}-${width}.png`,
-      });
-    }
-  } else {
-    await page.setViewportSize({ width: 320, height: 720 });
-    await noOverflow(page);
-    await page.screenshot({
-      path: `${screenshots}/${testInfo.project.name}-320.png`,
-      fullPage: true,
-    });
-  }
-  await page.getByRole("button", { name: "开始今晚的选片" }).click();
-  await expect(
-    page.getByRole("button", { name: "什么都行，直接看看" }),
-  ).toBeFocused();
-  await expect(
-    page.getByRole("button", { name: "什么都行，直接看看" }),
-  ).toBeInViewport();
-  await page.getByRole("tab", { name: "已知道片名" }).click();
-  const request = page.waitForRequest(
-    (r) => r.url().endsWith("/api/recommendations") && r.method() === "POST",
-  );
-  await page.getByRole("button", { name: /松弛一点/ }).click();
-  expect((await request).postDataJSON().constraints.max_runtime_minutes).toBe(
-    90,
-  );
-  await expect(page.getByRole("tab", { name: "不知道看什么" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await expect(page.locator(".candidate-grid > article")).toHaveCount(3);
-  await expect(
-    page
-      .getByRole("group", { name: /想要什么感觉/ })
-      .getByRole("button", { name: "轻松解压", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await noOverflow(page);
-});
-
-test("zero-input discovery, optional choices, keyboard selection and reset", async ({
-  page,
-}, testInfo) => {
-  await page.goto("/");
-  await expect(page.getByLabel("说说这次的观影想法")).not.toBeVisible();
-  const request = page.waitForRequest(
-    (r) => r.url().endsWith("/api/recommendations") && r.method() === "POST",
-  );
-  await page.getByRole("button", { name: "什么都行，直接看看" }).click();
-  const body = (await request).postDataJSON();
-  expect(body.query).toContain("没有特别偏好");
-  expect(body.constraints.preferred_tags).toEqual([]);
-  expect(body.constraints.max_runtime_minutes).toBeNull();
-  await expect(page.locator(".candidate-grid > article")).toHaveCount(3);
-  await expect(
-    page.getByText("3 部候选 / 最多 3 部", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText(/固定合成样例：展示3部/)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "远星航线" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "山野慢行" })).toBeVisible();
-  await page.getByRole("button", { name: "轻松解压", exact: true }).focus();
-  await page.keyboard.press("Space");
-  await page.getByRole("button", { name: "科幻", exact: true }).click();
-  await page.getByRole("button", { name: "两个人", exact: true }).click();
-  await page.getByRole("button", { name: "120 分钟内", exact: true }).click();
-  await expect(page.locator(".selection-summary")).toContainText(
-    "轻松解压 · 科幻 · 两个人 · 120 分钟内",
-  );
-  await page.locator(".composer").screenshot({
-    path: `${screenshots}/${testInfo.project.name}-choices.png`,
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-${info.project.name.startsWith("mobile") ? "320" : "1920"}.png`,
+    fullPage: true,
   });
-  const chosen = page.waitForRequest(
-    (r) => r.url().endsWith("/api/recommendations") && r.method() === "POST",
-  );
-  await page.getByRole("button", { name: "看看候选电影" }).click();
-  const selected = (await chosen).postDataJSON();
-  expect(selected.query).toContain("两个人");
-  expect(selected.constraints.preferred_tags).toEqual(["轻松解压", "科幻"]);
-  expect(selected.constraints.max_runtime_minutes).toBe(120);
-  await expect(page.locator(".candidate-grid > article")).toHaveCount(3);
-  await page.getByRole("button", { name: "清空选择", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "科幻", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator(".selection-summary")).toContainText(
-    "还没选也没关系",
-  );
-  await noOverflow(page);
+});
+test("unknown identities and scope documentation remain explicit", async ({
+  page,
+}) => {
+  await page.goto("/film/itunes%3A1");
+  await expect(page.getByRole("alert")).toContainText("影片");
+  await page.goto("/about");
+  await expect(page.getByRole("table")).toContainText("Apple 美国区公开数据");
+  await expect(page.getByRole("table")).toContainText("尚未实现");
   await accessible(page);
+  await page.goto("/unknown");
+  await expect(
+    page.getByRole("heading", { name: "这一页还没有开场" }),
+  ).toBeVisible();
 });

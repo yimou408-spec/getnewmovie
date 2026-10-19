@@ -1,36 +1,40 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Movie Agent S0 synthetic mock",
-    "description": "Local development only. Every fixture is synthetic; no persistence or model calls.",
+    "title": "Tonight movie catalog",
+    "description": "Apple US real charts. Rule-based matching, no synthetic fallback.",
     "version": "0.1.0"
   },
   "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/recommendations": {
       "post": {
         "summary": "Recommendations",
         "operationId": "recommendations_recommendations_post",
-        "parameters": [
-          {
-            "name": "x-mock-scenario",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "success",
-              "title": "X-Mock-Scenario"
-            }
-          }
-        ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RecommendationRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -43,35 +47,25 @@
               }
             }
           },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
           "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            },
-            "description": "Service Unavailable"
+            }
           },
           "504": {
+            "description": "Gateway Timeout",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            },
-            "description": "Gateway Timeout"
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -213,16 +207,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MovieSearchResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -415,6 +399,74 @@
             "type": "array",
             "maxItems": 20,
             "title": "Preferred Tags"
+          },
+          "moods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "轻松解压",
+                "温暖治愈",
+                "烧脑过瘾",
+                "浪漫心动",
+                "惊奇冒险",
+                "感动一下"
+              ]
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Moods"
+          },
+          "genres": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "喜剧",
+                "科幻与奇幻",
+                "惊悚",
+                "动作",
+                "爱情",
+                "动画",
+                "剧情",
+                "家庭",
+                "纪录片",
+                "恐怖"
+              ]
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Genres"
+          },
+          "company": {
+            "type": "string",
+            "enum": [
+              "",
+              "一个人",
+              "两个人",
+              "和朋友",
+              "和家人"
+            ],
+            "title": "Company",
+            "default": ""
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "balanced",
+              "popular"
+            ],
+            "title": "Sort By",
+            "default": "balanced"
+          },
+          "era": {
+            "type": "string",
+            "enum": [
+              "any",
+              "recent",
+              "2000s",
+              "classic"
+            ],
+            "title": "Era",
+            "default": "any"
           }
         },
         "additionalProperties": false,
@@ -446,6 +498,8 @@
             "type": "string",
             "enum": [
               "UPSTREAM_TIMEOUT",
+              "UPSTREAM_UNAVAILABLE",
+              "UPSTREAM_RATE_LIMIT",
               "NOT_CONFIGURED",
               "NOT_FOUND",
               "INVALID_SCENARIO"
@@ -555,7 +609,7 @@
         "properties": {
           "movie_id": {
             "type": "string",
-            "pattern": "^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*)$",
+            "pattern": "^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*|itunes:[1-9][0-9]*)$",
             "title": "Movie Id"
           },
           "title": {
@@ -615,6 +669,56 @@
             },
             "type": "array",
             "title": "Ratings"
+          },
+          "poster_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster Url"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "director": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Director"
+          },
+          "content_advisory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Advisory"
           }
         },
         "additionalProperties": false,
@@ -900,6 +1004,30 @@
           "memory_used": {
             "type": "boolean",
             "title": "Memory Used"
+          },
+          "catalog_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Size"
+          },
+          "matched_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Count"
           }
         },
         "additionalProperties": false,

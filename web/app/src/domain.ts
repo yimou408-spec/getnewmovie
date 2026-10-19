@@ -91,6 +91,7 @@ export function buildRequest(
   selected?: Movie,
   clarificationCount = 0,
   preferredTags: string[] = [],
+  preferences?: DiscoverPreferences,
 ): Request {
   if (mode === "known_movie" && !selected)
     throw new Error("请先查找并确认影片及年份。");
@@ -117,7 +118,12 @@ export function buildRequest(
       exclude_movie_ids: [],
       exclude_genres: [],
       preferred_tags: preferredTags,
-    },
+      moods: preferences?.moods ?? [],
+      genres: preferences?.genres ?? [],
+      company: preferences?.company ?? "",
+      sort_by: "balanced",
+      era: "any",
+    } as Request["constraints"],
   };
   if (!requestValid(request))
     throw new Error("请填写 1–2000 字的观影想法，并检查地区与时长。");
@@ -138,7 +144,7 @@ export async function api<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 15000);
+  const timer = window.setTimeout(() => controller.abort(), 45000);
   try {
     const res = await fetch(`/api${path}`, {
       ...options,
@@ -152,11 +158,15 @@ export async function api<T>(
           ? "输入未通过服务校验，请检查内容。"
           : raw.code === "NOT_CONFIGURED"
             ? "推荐服务尚未配置，请稍后再试。"
-            : raw.code === "UPSTREAM_TIMEOUT"
-              ? "推荐服务响应超时，可以重试。"
-              : res.status === 404
-                ? "没有找到这部影片，请重新查找。"
-                : "服务暂时无法完成请求，请重试。";
+            : raw.code === "UPSTREAM_RATE_LIMIT"
+              ? "资料源请求较多，请一分钟后重试。"
+              : raw.code === "UPSTREAM_UNAVAILABLE"
+                ? "电影资料源暂时不可用，已有结果仍可查看。"
+                : raw.code === "UPSTREAM_TIMEOUT"
+                  ? "推荐服务响应超时，可以重试。"
+                  : res.status === 404
+                    ? "没有找到这部影片，请重新查找。"
+                    : "服务暂时无法完成请求，请重试。";
       throw new ApiError(
         message,
         typeof raw.trace_id === "string" ? raw.trace_id : undefined,
@@ -168,7 +178,7 @@ export async function api<T>(
     if (error instanceof ApiError) throw error;
     throw new ApiError(
       error instanceof DOMException && error.name === "AbortError"
-        ? "等待超过 15 秒，请重试。"
+        ? "等待超过 45 秒，请重试。"
         : "连接失败，请确认本地服务已启动后重试。",
     );
   } finally {

@@ -15,6 +15,11 @@ class Constraints(StrictModel):
     exclude_movie_ids: list[str] = Field(default_factory=list, max_length=500)
     exclude_genres: list[str] = Field(default_factory=list, max_length=20)
     preferred_tags: list[str] = Field(default_factory=list, max_length=20)
+    moods: list[Literal["轻松解压", "温暖治愈", "烧脑过瘾", "浪漫心动", "惊奇冒险", "感动一下"]] = Field(default_factory=list, max_length=6)
+    genres: list[Literal["喜剧", "科幻与奇幻", "惊悚", "动作", "爱情", "动画", "剧情", "家庭", "纪录片", "恐怖"]] = Field(default_factory=list, max_length=10)
+    company: Literal["", "一个人", "两个人", "和朋友", "和家人"] = ""
+    sort_by: Literal["balanced", "popular"] = "balanced"
+    era: Literal["any", "recent", "2000s", "classic"] = "any"
 
 
 class RecommendationRequest(StrictModel):
@@ -52,7 +57,7 @@ class Rating(StrictModel):
 
 
 class Movie(StrictModel):
-    movie_id: str = Field(pattern=r"^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*)$")
+    movie_id: str = Field(pattern=r"^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*|itunes:[1-9][0-9]*)$")
     title: str
     year: int | None = Field(default=None, ge=1888, le=2200)
     runtime_minutes: int | None = Field(default=None, ge=1, le=600)
@@ -60,6 +65,10 @@ class Movie(StrictModel):
     genres: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     ratings: list[Rating] = Field(default_factory=list)
+    poster_url: HttpUrl | None = None
+    source_url: HttpUrl | None = None
+    director: str | None = None
+    content_advisory: str | None = None
 
 
 class Evidence(StrictModel):
@@ -112,6 +121,8 @@ class RecommendationResponse(StrictModel):
     questions: list[Question] = Field(max_length=2)
     warnings: list[str]
     memory_used: bool
+    catalog_size: int | None = Field(default=None, ge=0)
+    matched_count: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def validate_state_and_references(self):
@@ -150,7 +161,7 @@ class ErrorResponse(StrictModel):
     contract_version: Literal["0.1.0"] = VERSION
     trace_id: str
     data_mode: Literal["synthetic", "live", "cached"]
-    code: Literal["UPSTREAM_TIMEOUT", "NOT_CONFIGURED", "NOT_FOUND", "INVALID_SCENARIO"]
+    code: Literal["UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RATE_LIMIT", "NOT_CONFIGURED", "NOT_FOUND", "INVALID_SCENARIO"]
     message: str
     retryable: bool
 

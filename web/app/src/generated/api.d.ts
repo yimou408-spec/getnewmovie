@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  "/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Health */
+    get: operations["health_health_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/recommendations": {
     parameters: {
       query?: never;
@@ -125,6 +142,46 @@ export interface components {
       exclude_genres?: string[];
       /** Preferred Tags */
       preferred_tags?: string[];
+      /** Moods */
+      moods?: (
+        | "轻松解压"
+        | "温暖治愈"
+        | "烧脑过瘾"
+        | "浪漫心动"
+        | "惊奇冒险"
+        | "感动一下"
+      )[];
+      /** Genres */
+      genres?: (
+        | "喜剧"
+        | "科幻与奇幻"
+        | "惊悚"
+        | "动作"
+        | "爱情"
+        | "动画"
+        | "剧情"
+        | "家庭"
+        | "纪录片"
+        | "恐怖"
+      )[];
+      /**
+       * Company
+       * @default
+       * @enum {string}
+       */
+      company: "" | "一个人" | "两个人" | "和朋友" | "和家人";
+      /**
+       * Sort By
+       * @default balanced
+       * @enum {string}
+       */
+      sort_by: "balanced" | "popular";
+      /**
+       * Era
+       * @default any
+       * @enum {string}
+       */
+      era: "any" | "recent" | "2000s" | "classic";
     };
     /** ErrorResponse */
     ErrorResponse: {
@@ -147,6 +204,8 @@ export interface components {
        */
       code:
         | "UPSTREAM_TIMEOUT"
+        | "UPSTREAM_UNAVAILABLE"
+        | "UPSTREAM_RATE_LIMIT"
         | "NOT_CONFIGURED"
         | "NOT_FOUND"
         | "INVALID_SCENARIO";
@@ -206,6 +265,14 @@ export interface components {
       tags?: string[];
       /** Ratings */
       ratings?: components["schemas"]["Rating"][];
+      /** Poster Url */
+      poster_url?: string | null;
+      /** Source Url */
+      source_url?: string | null;
+      /** Director */
+      director?: string | null;
+      /** Content Advisory */
+      content_advisory?: string | null;
     };
     /** MovieSearchResponse */
     MovieSearchResponse: {
@@ -315,6 +382,10 @@ export interface components {
       warnings: string[];
       /** Memory Used */
       memory_used: boolean;
+      /** Catalog Size */
+      catalog_size?: number | null;
+      /** Matched Count */
+      matched_count?: number | null;
     };
     /** ValidationError */
     ValidationError: {
@@ -338,12 +409,30 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  health_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
   recommendations_recommendations_post: {
     parameters: {
       query?: never;
-      header?: {
-        "x-mock-scenario"?: string;
-      };
+      header?: never;
       path?: never;
       cookie?: never;
     };
@@ -360,15 +449,6 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["RecommendationResponse"];
-        };
-      };
-      /** @description Bad Request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
       /** @description Validation Error */
@@ -492,15 +572,6 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["MovieSearchResponse"];
-        };
-      };
-      /** @description Not Found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
       /** @description Validation Error */

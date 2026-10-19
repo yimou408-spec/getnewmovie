@@ -7,3 +7,10 @@
 图片从原始页面公开的 Unsplash 图片地址取得，转为 WebP 并按容器裁切，叠加文字可读性渐变。它不是项目原创图片，也不是任何候选电影的海报、剧照或观看渠道证据。不作为独立素材售卖或图库内容分发。
 
 Lucide 图标沿用项目依赖 `lucide-react`，许可证为 ISC。品牌文字、排版及页面布局由项目代码实现；没有复制参考网站的品牌或素材。
+
+
+## 真实电影海报与商店标识（2026-10-19）
+
+海报由 Apple 美国区电影 RSS/lookup 原样返回的 HTTPS `*.mzstatic.com` URL 加载，不下载至仓库，不猜测更大分辨率 URL；仅用于介绍对应影片，并紧邻可点击的对应美国区电影商店链接。API 文档：[Search API](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/)。
+
+`web/app/public/itunes-store-badge.svg` 是 Apple 官方原始 SVG，未修改图形。来源：[官方标识指南](https://marketing.services.apple/itunes-identity-guidelines)，[官方 US/UK 素材包](https://www.apple.com/105/media/us/ipoditunes/itunes/2018/3a5387c5_1ebd_4993_9633_ff7264dc27bf/itunes-store-badges/us_uk.zip)，包内 `US_UK/iTunes_Store_Badge/Get_it_on/SVG/US_UK_iTunes_Store_Get_Badge_RGB_012618.svg`。页面关于说明保留商标归属。电影与海报版权属于相应权利人；使用公开接口不构成任意商业再授权。
