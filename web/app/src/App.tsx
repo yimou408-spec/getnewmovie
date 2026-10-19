@@ -238,35 +238,79 @@ function ErrorNotice({ error, retry }: { error: Error; retry?: () => void }) {
   );
 }
 function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
-  const [failed, setFailed] = useState(false);
+  const [status, setStatus] = useState<
+    "loading" | "ready" | "error" | "timeout"
+  >("loading");
+  const [attempt, setAttempt] = useState(0);
   const url = safeSourceUrl(movie.poster_url);
+  const imageUrl = url ? new URL(url) : undefined;
+  // A stalled image request can survive removal and absorb a same-URL retry.
+  // Keep the provider asset/path and give an explicit retry a new request URL.
+  if (attempt > 0)
+    imageUrl?.searchParams.set("_artwork_retry", String(attempt));
   const canShow =
     url &&
     new URL(url).hostname.endsWith(".mzstatic.com") &&
     movie.source_url &&
-    !failed;
+    status !== "error" &&
+    status !== "timeout";
+  useEffect(() => {
+    if (!canShow || status !== "loading") return;
+    const timeout = window.setTimeout(() => setStatus("timeout"), 12000);
+    return () => window.clearTimeout(timeout);
+  }, [canShow, status, attempt]);
   return (
-    <div
-      className={`poster ${small ? "small" : ""} ${canShow ? "has-artwork" : ""}`}
-    >
-      {canShow ? (
-        <img
-          src={url}
-          alt={`${movie.title} 海报`}
-          loading="lazy"
-          decoding="async"
-          width="170"
-          height="255"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <>
-          <span className="poster-frame" aria-hidden="true">
-            <Film size={small ? 24 : 40} />
-          </span>
-          <span className="poster-title">{movie.title}</span>
-          <small>{failed ? "海报加载失败" : "海报尚未提供"}</small>
-        </>
+    <div className="poster-link">
+      <Link
+        to={`/film/${encodeURIComponent(movie.movie_id)}`}
+        aria-label={`查看 ${movie.title} ${movie.year} 资料`}
+        className={`poster ${small ? "small" : ""} ${canShow ? "has-artwork" : ""}`}
+      >
+        {canShow ? (
+          <>
+            <img
+              key={attempt}
+              src={imageUrl?.href}
+              alt={`${movie.title} 海报`}
+              loading="eager"
+              decoding="async"
+              width="170"
+              height="255"
+              onLoad={() => setStatus("ready")}
+              onError={() => setStatus("error")}
+            />
+            {status === "loading" && (
+              <small className="poster-loading">海报加载中…</small>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="poster-frame" aria-hidden="true">
+              <Film size={small ? 24 : 40} />
+            </span>
+            <span className="poster-title">{movie.title}</span>
+            <small>
+              {status === "timeout"
+                ? "海报加载超时"
+                : status === "error"
+                  ? "海报加载失败"
+                  : "海报尚未提供"}
+            </small>
+          </>
+        )}
+      </Link>
+      {(status === "error" || status === "timeout") && (
+        <button
+          type="button"
+          className="poster-retry"
+          aria-label={`重试 ${movie.title} 海报`}
+          onClick={() => {
+            setAttempt((previous) => previous + 1);
+            setStatus("loading");
+          }}
+        >
+          重试海报
+        </button>
       )}
     </div>
   );
@@ -512,13 +556,11 @@ export default function App() {
         className={`movie-card ${candidate ? "recommendation-card" : ""}`}
         key={movie.movie_id}
       >
-        <Link
-          to={`/film/${encodeURIComponent(movie.movie_id)}`}
-          className="poster-link"
-          aria-label={`查看 ${movie.title} ${movie.year} 资料`}
-        >
-          <Poster movie={movie} small={!candidate} />
-        </Link>
+        <Poster
+          key={movie.poster_url ?? movie.movie_id}
+          movie={movie}
+          small={!candidate}
+        />
         <div className="movie-body">
           <div className="movie-heading">
             <div>

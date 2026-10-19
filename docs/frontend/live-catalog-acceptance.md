@@ -24,22 +24,24 @@
 
 ## Chrome 实际页面验收
 
-本机已安装 Chrome，Playwright 单 worker、无重试。每个组合 7 项，共 **28 项通过**，耗时 53.5 秒。截图来自本次最新实现。
+本机已安装 Chrome，Playwright 单 worker、无重试。每个组合 8 项，共 **32 项通过**，耗时 1.0 分钟。截图来自本次最新实现。
 
 | 视口和系统主题 | 工作流结果 | 首页 | 真实候选视口 | 完整候选 |
 | --- | --- | --- | --- | --- |
-| 桌面 1440×1000 浅色 | 7/7 | [截图](screenshots/desktop-light-home.png) | [截图](screenshots/desktop-light-result-viewport.png) | [截图](screenshots/desktop-light-result.png) |
-| 桌面 1440×1000 深色 | 7/7 | [截图](screenshots/desktop-dark-home.png) | [截图](screenshots/desktop-dark-result-viewport.png) | [截图](screenshots/desktop-dark-result.png) |
-| 手机宽度 390×844 浅色 | 7/7 | [截图](screenshots/mobile-light-home.png) | [截图](screenshots/mobile-light-result-viewport.png) | [截图](screenshots/mobile-light-result.png) |
-| 手机宽度 390×844 深色 | 7/7 | [截图](screenshots/mobile-dark-home.png) | [截图](screenshots/mobile-dark-result-viewport.png) | [截图](screenshots/mobile-dark-result.png) |
+| 桌面 1440×1000 浅色 | 8/8 | [截图](screenshots/desktop-light-home.png) | [截图](screenshots/desktop-light-result-viewport.png) | [截图](screenshots/desktop-light-result.png) |
+| 桌面 1440×1000 深色 | 8/8 | [截图](screenshots/desktop-dark-home.png) | [截图](screenshots/desktop-dark-result-viewport.png) | [截图](screenshots/desktop-dark-result.png) |
+| 手机宽度 390×844 浅色 | 8/8 | [截图](screenshots/mobile-light-home.png) | [截图](screenshots/mobile-light-result-viewport.png) | [截图](screenshots/mobile-light-result.png) |
+| 手机宽度 390×844 深色 | 8/8 | [截图](screenshots/mobile-dark-home.png) | [截图](screenshots/mobile-dark-result-viewport.png) | [截图](screenshots/mobile-dark-result.png) |
 
 覆盖：无需输入选出 3 部真实影片及海报加载；来源链接；心情、类型和时长改变结果；冲突空态及重置；换一组排除旧影片；年代过滤、排序选择、排除持续生效及撤销；按实际返回片名搜索并确认身份；片单、两片对比、刷新后会话边界；数据源故障及无效响应保留旧结果；海报故障提示；主题随系统立即切换；键盘焦点；axe 无严重/致命问题；320px 和 1920px 无页面横向溢出；未知影片和未接入能力提示。
 
-手机验收采用 Chrome 窄视口模拟，未在实体 iOS/Android 设备上测试。图片故障测试主动触发懒加载图片后核对错误提示，不把屏幕外尚未请求的图片当作已加载失败。
+手机验收采用 Chrome 窄视口模拟，未在实体 iOS/Android 设备上测试。少量候选海报立即请求；12 秒无响应时保留影片信息并显示重试入口。新增测试模拟请求一直挂起，验证超时、重试失败反馈、深色对比度及再次重试后真实 CDN 图片加载成功。主流程仍核对真实海报成功加载，故障注入只在专门用例中生效。
+
+前一提交的云端 push 检查 28/28 通过，PR 检查 25/28 通过：三个失败用例都停在真实海报加载等待。下载 trace 后确认 CDN 请求已发出但一直没有响应，并非未触发加载。本次补上显式超时和可实际发起新请求的重试，同时保留真实海报验收；后续云端结果以 PR 最新提交检查为准。
 
 ## 其他检查
 
-- 后端与契约校验：45 项通过，包含 10 项真实数据适配器离线测试（上游故障、搜索空结果回退、未知/边界时长、严格交叉筛选、身份校验）和 3 项冻结排序规则用例。规则用例不是主观推荐质量评测。
+- 后端与契约校验：45 项通过，包含 10 项真实数据适配器离线测试（上游故障、搜索空结果回退、未知/边界时长、严格交叉筛选、身份校验及海报 URL 序列化）和 3 项冻结排序规则用例。规则用例不是主观推荐质量评测。
 - 前端单元测试：5 项通过。
 - 前端生产构建、格式和生成类型检查通过。
 - 图片、数据故障注入仅存在于测试，实际主流程连接真实运行服务。

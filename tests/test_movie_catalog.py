@@ -25,7 +25,8 @@ def transport(request):
     category = next((g for g in ["4404", "4406", "4410"] if f"genre={g}" in request.url.path), None)
     selected = {"4404": [101, 104], "4406": [102], "4410": [103]}.get(category, [101, 102, 103, 104])
     return httpx.Response(200, json={"feed": {"entry": [
-        {"id": {"attributes": {"im:id": str(i)}}, "im:name": {"label": next(r["trackName"] for r in records if r["trackId"] == i)}} for i in selected
+        {"id": {"attributes": {"im:id": str(i)}}, "im:name": {"label": next(r["trackName"] for r in records if r["trackId"] == i)},
+         "im:image": [{"label": f"https://is1-ssl.mzstatic.com/image/{i}/113x170bb.png"}]} for i in selected
     ]}})
 
 
@@ -38,6 +39,10 @@ def recommend(c, **constraints):
 
 
 def test_default_real_contract_and_sources_and_cache():
+    provider = AppleCatalog(httpx.Client(transport=httpx.MockTransport(transport)), rate_limit=100)
+    for movie, _ in provider.pool([]):
+        # Merged RSS artwork must retain the authoritative HttpUrl field type.
+        movie.model_dump(mode="json", warnings="error")
     with client() as c:
         r = recommend(c).json()
         assert r["data_mode"] == "live" and len(r["candidates"]) == 3

@@ -334,6 +334,58 @@ test("system theme changes immediately, keyboard focus and narrow layout", async
     fullPage: true,
   });
 });
+test("stalled artwork times out and can be retried without losing the film", async ({
+  page,
+}, info) => {
+  await page.clock.install();
+  let pending = true;
+  let requests = 0;
+  await page.route("**/*.mzstatic.com/**", async (route) => {
+    requests += 1;
+    if (pending) await new Promise(() => {});
+    else await route.abort();
+  });
+  const data = await submit(page);
+  await expect(page.getByText("海报加载中…", { exact: true })).toHaveCount(3);
+  await page.clock.fastForward(12001);
+  await expect(page.getByText("海报加载超时", { exact: true })).toHaveCount(3);
+  await expect(
+    page.getByRole("heading", {
+      name: data.candidates[0].movie.title,
+      exact: true,
+    }),
+  ).toBeVisible();
+  const before = requests;
+  pending = false;
+  await page
+    .getByRole("button", { name: /^重试 .* 海报$/ })
+    .first()
+    .click();
+  await expect.poll(() => requests).toBeGreaterThan(before);
+  await expect(page.getByText("海报加载失败", { exact: true })).toHaveCount(1);
+  await noOverflow(page);
+  await accessible(page);
+  await page.screenshot({
+    path: `../../artifacts/live-catalog/${info.project.name}-artwork-timeout.png`,
+  });
+  await page.unroute("**/*.mzstatic.com/**");
+  await page
+    .getByRole("button", { name: /^重试 .* 海报$/ })
+    .first()
+    .click();
+  await expect
+    .poll(
+      () =>
+        page
+          .locator(".candidate-grid .poster img")
+          .first()
+          .evaluate(
+            (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+          ),
+      { timeout: 20000 },
+    )
+    .toBe(true);
+});
 test("unknown identities and scope documentation remain explicit", async ({
   page,
 }) => {

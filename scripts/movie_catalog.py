@@ -13,6 +13,7 @@ from threading import RLock
 from urllib.parse import urlparse
 
 import httpx
+from pydantic import HttpUrl
 
 from scripts.s0_contracts import Movie
 from scripts.movie_ranking import content_clues
@@ -151,7 +152,8 @@ class AppleCatalog:
         for movie, retrieved in films:
             mid = movie.movie_id.split(":")[1]
             movie.genres = sorted(set(movie.genres) | membership[mid])
-            movie.poster_url = posters.get(mid) or movie.poster_url
+            if mid in posters:
+                movie.poster_url = HttpUrl(posters[mid])
         return films
 
     def search(self, query, year=None):
