@@ -6,3 +6,7 @@ __pycache__/
 artifacts/
 node_modules/
 *.pyc
+web/app/dist/
+web/app/test-results/
+web/app/playwright-report/
+web/app/*.tsbuildinfo

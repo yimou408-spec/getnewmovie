@@ -22,6 +22,17 @@ def test_shared_responses_conform(scenario):
     RecommendationResponse.model_validate(load(scenario))
 
 
+def test_success_previews_are_three_distinct_fixed_synthetic_movies():
+    with TestClient(app) as client:
+        response = client.post("/recommendations", json=load("request")).json()
+        cards = response["candidates"]
+        assert len(cards) == 3
+        assert len({card["movie"]["movie_id"] for card in cards}) == 3
+        assert "固定" in "".join(response["warnings"])
+        for card in cards:
+            assert client.get(f'/movies/{card["movie"]["movie_id"]}').status_code == 200
+
+
 def test_rejects_four_cards_and_unbound_evidence():
     data = load("success")
     data["candidates"] *= 4

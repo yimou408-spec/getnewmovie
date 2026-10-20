@@ -1,0 +1,40 @@
+name: Frontend product acceptance
+on:
+  push:
+  pull_request:
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-s0.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/app/package-lock.json
+      - run: python -m pip install -r ../../requirements-s0.txt
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run types:check
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-acceptance
+          path: |
+            web/app/playwright-report/
+            web/app/test-results/
+            docs/frontend/screenshots/
+          retention-days: 14

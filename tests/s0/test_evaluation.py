@@ -39,7 +39,17 @@ def test_evaluator_does_not_count_missing_or_duplicate_predictions_as_success():
 
 
 def test_evaluator_passes_valid_synthetic_case_without_claiming_user_value():
-    result = evaluate([task()], [{"task_id": "test", "response": fixture("success")}])
+    response = fixture("success")
+    # Only this card satisfies the task's required tag. The multi-card UI preview
+    # deliberately makes no claim to have matched or filtered these preferences.
+    response["candidates"] = [response["candidates"][0]]
+    result = evaluate([task()], [{"task_id": "test", "response": response}])
     assert result["passed"]
     assert result["human_relevance"] == "not_measured"
     assert result["spoiler_safety"] == "not_measured"
+
+
+def test_fixed_preview_is_not_mistaken_for_personalized_recommendations():
+    result = evaluate([task()], [{"task_id": "test", "response": fixture("success")}])
+    assert not result["passed"]
+    assert "required_tag_missing" in result["results"][0]["violations"]
