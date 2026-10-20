@@ -1,0 +1,1259 @@
+{
+  "title": "2026-10-20至10-31三人开发任务台账",
+  "timezone": "Asia/Shanghai",
+  "target_delivery": "2026-10-29",
+  "hard_deadline": "2026-10-31",
+  "repositories": {
+    "primary": "https://github.com/yimou408-spec/getnewmovie",
+    "current_fork": "https://github.com/2284266609-code/getnewmovie",
+    "pull_request_base": "yimou408-spec/getnewmovie:main",
+    "remote_changes_executed": false
+  },
+  "assumptions": {
+    "oct20_hours_per_person": 2,
+    "oct21_to_28_hours_per_day_per_person": 6,
+    "oct29_hours_per_person": 2,
+    "oct30_31_buffer_hours_per_day_per_person": 4,
+    "weekends_included": true,
+    "all_hours_are_estimates": true,
+    "production_implementation_not_started_by_this_document": true,
+    "repository_coordination": "confirmed: primary yimou408-spec/getnewmovie; 2284266609-code/getnewmovie is fork; changes enter primary via pull requests"
+  },
+  "people": [
+    {
+      "key": "P",
+      "name": "PionneerZ",
+      "role": "前端、交互与端到端体验",
+      "reviewer": "2284266609-code"
+    },
+    {
+      "key": "Y",
+      "name": "yimou408-spec",
+      "role": "服务、数据与豆瓣接入",
+      "reviewer": "PionneerZ"
+    },
+    {
+      "key": "C",
+      "name": "2284266609-code",
+      "role": "推荐、DeepSeek与Agent",
+      "reviewer": "yimou408-spec"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "P00",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-20",
+      "phase": "启动",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "同步主仓库前端现状与状态清点",
+      "steps": "以主仓库8f9f486为参考核对现有React页面、API代理、主题与端到端测试，列出新增状态；不重复初始化已有前端。",
+      "deliverables": "现有能力/新增需求对照、前端增量方案",
+      "acceptance": "现有点选、比较、片单与明暗主题保留；明确新增自然语言、证据和记忆交互。",
+      "verification": "核对S0六类状态；记录环境版本。",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P01",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-21",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "既有前端类型、请求层与能力状态适配",
+      "steps": "沿用web/app和锁文件；适配新契约、TanStack Query和能力标记，统一新错误、取消与数据源状态。",
+      "deliverables": "现有请求层、生成类型和能力/状态组件增量",
+      "acceptance": "保留当前页面和Vite /api代理；新旧字段兼容；不把Apple元数据当口碑核验；更新类型不手改生成文件。",
+      "verification": "请求成功、超时、422、503的组件用例。",
+      "depends_on": [
+        "P00",
+        "Y00"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P01-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-21",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P01",
+        "Y01"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P02",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-22",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "自然语言输入与澄清交互",
+      "steps": "在已有零输入/点选界面加入自然语言主入口、条件回显和追问；复用会话UI，处理文字与点选冲突、重复提交和取消。",
+      "deliverables": "输入组件、澄清组件、会话状态",
+      "acceptance": "自然语言实际参与匹配；澄清不显示电影卡；保留点选作为辅助，旧响应不能覆盖新结果。",
+      "verification": "澄清、重试、取消、连续提交乱序用例。",
+      "depends_on": [
+        "P01",
+        "Y00"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P02-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-22",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P02",
+        "Y02"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P03",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-23",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "推荐卡与证据展示",
+      "steps": "复用现有候选卡和来源展示，增加观点、匹配解释、证据抽屉、评分出处、时间和单片缺证状态。",
+      "deliverables": "推荐卡、证据抽屉、空结果与降级界面",
+      "acceptance": "原海报/元数据仍可用；豆瓣与其他平台分别展示；单源/豆瓣失败明确标注，评分不混合。",
+      "verification": "0/1/2/3部、空值、危险链接、长文本与证据缺失用例。",
+      "depends_on": [
+        "P02",
+        "Y02",
+        "C02"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P03-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-23",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P03",
+        "Y03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P04",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-24",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "既有比较与反馈的证据/持久化升级",
+      "steps": "复用当前比较和本次片单，增加口碑差异、反馈event_id、服务端已看和临时意愿区分。",
+      "deliverables": "比较页、反馈组件、请求状态更新",
+      "acceptance": "已有比较不回退；未知信息不当差评；本次片单继续兼容但不扩展批量导入。",
+      "verification": "比较选择、重复反馈、换批排除、失败重试用例。",
+      "depends_on": [
+        "P03",
+        "C03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P04-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-24",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P04",
+        "Y04"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P05",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-25",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "真实推荐链路联调",
+      "steps": "在现有真实Apple服务路径上联调自然语言、澄清和多源结果；保留/api代理和非合成服务身份，加入trace_id。",
+      "deliverables": "前后端完整交互链",
+      "acceptance": "真实输入走到真实候选；只有最终响应改变结果；超时得到最终降级或受控错误。",
+      "verification": "一条成功路径和空结果、豆瓣失败、模型失败路径。",
+      "depends_on": [
+        "P04",
+        "Y04",
+        "C04"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P05-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-25",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P05",
+        "Y05"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P06",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-26",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "记忆管理与小规模体验测试",
+      "steps": "实现记忆开关、确认、修改删除、已看列表和数据清理；用统一脚本组织形成性试用。",
+      "deliverables": "偏好管理页、已看页、匿名体验记录",
+      "acceptance": "记忆关闭仍可推荐；今天不想看不成为永久偏好；无法招募时如实记待验证。",
+      "verification": "跨会话、偏好改删、失败回滚；建议3–5位试用者，每人同难度任务。",
+      "depends_on": [
+        "P05",
+        "Y03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P06-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-26",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P06",
+        "Y06"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P07",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-27",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "端到端与可访问性回归",
+      "steps": "复用现有Playwright四组合与无障碍检查，新增自然语言、证据、记忆和最终降级用例；与Y拆分离线检查和显式联网验收。",
+      "deliverables": "tests/e2e；缺陷列表",
+      "acceptance": "新增主流程通过，已有点选/比较/主题不回退；真实上游测试独立标记，离线用例不冒充真实验收。",
+      "verification": "端到端回归、键盘操作和小屏人工检查。",
+      "depends_on": [
+        "P05",
+        "P06",
+        "Y06",
+        "C06"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P07-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-27",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P07",
+        "Y07"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P08",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-28",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "演示界面收尾与用户文档",
+      "steps": "修复冻结范围缺陷，更新已有docs/frontend说明、真实截图和演示步骤；保留现有视觉资产与素材归属。",
+      "deliverables": "演示指南、截图、用户操作说明",
+      "acceptance": "全新浏览器可完成演示；截图对应当前版本；真实与缓存标记准确。",
+      "verification": "回归高频任务及一次网络故障演示。",
+      "depends_on": [
+        "P07",
+        "Y07",
+        "C07"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P08-Q",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-28",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审yimou408-spec当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "P08",
+        "Y08"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P09",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-29",
+      "phase": "交付",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "交付界面与材料终检",
+      "steps": "按固定演示脚本走通交付版本，核对操作指南、素材和已知限制。",
+      "deliverables": "交付清单与前端签字记录",
+      "acceptance": "引用链接、比较与偏好操作可演示；交付包不含无用构建或私密数据。",
+      "verification": "交付版本最小端到端冒烟。",
+      "depends_on": [
+        "P08"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "P10",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-30",
+      "phase": "条件缓冲",
+      "hours": 4,
+      "complexity_points": null,
+      "title": "截止前缺陷缓冲与重验",
+      "steps": "只处理阻碍交付的已确认缺陷、数据验证或环境复现；按风险重新分配，不增加功能。",
+      "deliverables": "必要补丁、复验结果与版本记录",
+      "acceptance": "不得用缓冲新增非首版功能；核心源仍不可用时如实报告。",
+      "verification": "修复复现用例及最终主链冒烟。",
+      "depends_on": [
+        "P09"
+      ],
+      "status": "conditional",
+      "evidence": null
+    },
+    {
+      "id": "P11",
+      "owner": "PionneerZ",
+      "reviewer": "2284266609-code",
+      "date": "2026-10-31",
+      "phase": "条件缓冲",
+      "hours": 4,
+      "complexity_points": null,
+      "title": "硬截止交付修复与封存",
+      "steps": "核对修复、跑最终冒烟并归档交付；如已交付可不启用该缓冲。",
+      "deliverables": "必要补丁、复验结果与版本记录",
+      "acceptance": "不得用缓冲新增非首版功能；核心源仍不可用时如实报告。",
+      "verification": "修复复现用例及最终主链冒烟。",
+      "depends_on": [
+        "P10"
+      ],
+      "status": "conditional",
+      "evidence": null
+    },
+    {
+      "id": "Y00",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-20",
+      "phase": "启动",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "主仓库对齐、后端基线与契约差异",
+      "steps": "先保存本地规划，再按fork/PR流程对齐主仓库；核对movie_server/catalog/ranking、真实OpenAPI和既有测试，列出增量而非重建服务。",
+      "deliverables": "环境记录、样本清单、契约差异清单",
+      "acceptance": "主仓库已有能力与新增目标有对照；未覆盖本地未提交文档；角色、配置与接口入口一致。",
+      "verification": "既有S0检查的启动条件和配置缺失路径。",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y01",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-21",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "自动豆瓣可行性验证",
+      "steps": "构建最小探测路径，先验证3部电影，记录影片身份、可取评价粒度、访问条件和失败状态。",
+      "deliverables": "豆瓣探测脚本及契约测试；脱敏探测结论",
+      "acceptance": "有真实自动取得的评价证据及出处；仅评分/搜索链接不判通过；失败形成可复核记录。",
+      "verification": "同名、空内容、访问受限、超时的HTTP离线契约。",
+      "depends_on": [
+        "Y00"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y01-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-21",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y01",
+        "C01"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y02",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-22",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "现有影片源身份映射、豆瓣适配与契约冻结",
+      "steps": "保留Apple和itunes:身份；验证TMDB补充中文/长尾字段，建立与豆瓣的外部ID映射；统一Evidence、新状态和生成Schema。",
+      "deliverables": "影片/豆瓣适配器、Schema、Mock、契约变更记录",
+      "acceptance": "旧itunes:、海报、导演和筛选字段仍合法；同名翻拍不混淆；第二源字段及前端类型一起冻结。",
+      "verification": "匹配歧义、字段缺失、重复ID与Schema导出检查。",
+      "depends_on": [
+        "Y01",
+        "C01"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y02-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-22",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y02",
+        "C02"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y03",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-23",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "现有服务渐进分层与SQLite仓储",
+      "steps": "保留scripts.movie_server真实入口，将新增配置/会话/证据/记忆服务渐进放入app包；实现数据库迁移和仓储，复用已有create_app测试注入。",
+      "deliverables": "app/api、app/services、数据库与迁移",
+      "acceptance": "旧API、健康检查和无合成回退保持；会话与长期偏好分开，不先整体搬迁重写服务。",
+      "verification": "临时SQLite迁移、仓储事务、空配置与本地身份用例。",
+      "depends_on": [
+        "Y02",
+        "C02"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y03-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-23",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y03",
+        "C03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y04",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-24",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "证据包、缓存与独立来源分组",
+      "steps": "归一豆瓣与第二源，保存出处/粒度/作者/时间；实现转载分组、TTL与状态；不将LLM或长时影评检索包在已有catalog.lock中。",
+      "deliverables": "证据服务、缓存层、适配器统一结果",
+      "acceptance": "两个域名不自动算独立；过期不冒充新采集；来源失败和无评论状态有区别。",
+      "verification": "重复转载、缓存命中/过期、同片引用和安全URL用例。",
+      "depends_on": [
+        "Y02",
+        "C02",
+        "Y03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y04-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-24",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y04",
+        "C04"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y05",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-25",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "现有推荐/比较增强与新会话/反馈API",
+      "steps": "增强既有/recommendations、/comparisons并注入C图；新增/sessions、/feedback，保持真实服务、代理与生成类型链一致。",
+      "deliverables": "/sessions、/recommendations、/comparisons、/feedback",
+      "acceptance": "25日晚既有页面可走自然语言和真实多源；旧点选路径仍有效；无合成回退、幂等与最终状态正确。",
+      "verification": "TestClient端到端、重复event_id、无结果与超时响应。",
+      "depends_on": [
+        "Y03",
+        "Y04",
+        "C04"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y05-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-25",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y05",
+        "C05"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y06",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-26",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "长期记忆、身份隔离与删除",
+      "steps": "落库已看/确认偏好；实现开关、改删、撤销、版本失效和会话清理；与C确认覆盖语义。",
+      "deliverables": "/me/preferences、/me/seen、/me/data及仓储",
+      "acceptance": "跨会话有效，临时意愿不落长期表；测试身份隔离；删除不从旧会话恢复。",
+      "verification": "幂等、隔离、偏好版本、关联删除与关闭记忆用例。",
+      "depends_on": [
+        "Y03",
+        "Y05"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y06-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-26",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y06",
+        "C06"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y07",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-27",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "上游故障、预算账本与运行观测",
+      "steps": "保留已有Apple进程级20次/分钟约束；加入全请求HTTP/搜索预算、绝对时限、退避、trace与脱敏日志，不能等待源限流窗口超过总时限。",
+      "deliverables": "调用账本、错误映射、时延/用量统计",
+      "acceptance": "重试分页同样计数；任何单源异常不使请求无限等待；日志不泄露Key。",
+      "verification": "429、超时、重定向、schema变化、预算耗尽与查询参数安全用例。",
+      "depends_on": [
+        "Y05",
+        "Y06",
+        "C06"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y07-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-27",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y07",
+        "C07"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y08",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-28",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "运行打包与发布候选后端",
+      "steps": "复用现有CI与前后端锁文件，在干净环境复现；将真实上游验收显式分离，补迁移/备份恢复和多源故障说明。",
+      "deliverables": "后端启动说明、锁定依赖、备份恢复与RC记录",
+      "acceptance": "全新环境能复现；S0和产品离线检查通过；真实冒烟与离线测试分开。",
+      "verification": "一次干净安装/迁移/备份恢复及真实小样冒烟。",
+      "depends_on": [
+        "Y07",
+        "P07"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y08-Q",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-28",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审2284266609-code当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "Y08",
+        "C08"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y09",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-29",
+      "phase": "交付",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "交付服务与运行终检",
+      "steps": "复核交付版本服务、数据文件位置、配置说明和真实来源状态，留存交付版本哈希。",
+      "deliverables": "服务交付清单、配置与恢复记录",
+      "acceptance": "能按说明启动；真实与缓存证据可追踪；无密钥或个人数据库误提交。",
+      "verification": "交付环境API冒烟与敏感文件检查。",
+      "depends_on": [
+        "Y08"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "Y10",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-30",
+      "phase": "条件缓冲",
+      "hours": 4,
+      "complexity_points": null,
+      "title": "截止前缺陷缓冲与重验",
+      "steps": "只处理阻碍交付的已确认缺陷、数据验证或环境复现；按风险重新分配，不增加功能。",
+      "deliverables": "必要补丁、复验结果与版本记录",
+      "acceptance": "不得用缓冲新增非首版功能；核心源仍不可用时如实报告。",
+      "verification": "修复复现用例及最终主链冒烟。",
+      "depends_on": [
+        "Y09"
+      ],
+      "status": "conditional",
+      "evidence": null
+    },
+    {
+      "id": "Y11",
+      "owner": "yimou408-spec",
+      "reviewer": "PionneerZ",
+      "date": "2026-10-31",
+      "phase": "条件缓冲",
+      "hours": 4,
+      "complexity_points": null,
+      "title": "硬截止交付修复与封存",
+      "steps": "核对修复、跑最终冒烟并归档交付；如已交付可不启用该缓冲。",
+      "deliverables": "必要补丁、复验结果与版本记录",
+      "acceptance": "不得用缓冲新增非首版功能；核心源仍不可用时如实报告。",
+      "verification": "修复复现用例及最终主链冒烟。",
+      "depends_on": [
+        "Y10"
+      ],
+      "status": "conditional",
+      "evidence": null
+    },
+    {
+      "id": "C00",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-20",
+      "phase": "启动",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "Agent状态与DeepSeek准备",
+      "steps": "基于现有movie_ranking和点选约束梳理Agent增量；确认DeepSeek配置，标出文字当前不参与匹配等缺口，准备新验收任务。",
+      "deliverables": "图状态草案、模型配置说明、评估任务草案",
+      "acceptance": "单Agent边界明确；LLM不决定硬过滤、事实白名单或长期写入权限。",
+      "verification": "至少列出否定、临时偏好、来源冲突与空结果验收例。",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C01",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-21",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "DeepSeek Flash与影片源小实验",
+      "steps": "验证DeepSeek结构化条件及截断/失败；对照现有Apple目录，少量探测TMDB中文别名和身份补充，不将新源默认替换旧源。",
+      "deliverables": "DeepSeek适配器探测、TMDB初测、模型兼容性结论",
+      "acceptance": "实际模型名/响应model被记录；不将单句解析成功当推荐通过；TMDB仅作影片源。",
+      "verification": "否定、时长、空content、finish_reason、超时与错误输出。",
+      "depends_on": [
+        "C00"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C01-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-21",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C01",
+        "P01"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C02",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-22",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "第二独立评价源与抽取接口",
+      "steps": "验证至少一条独立评价来源；定义可支持观点的摘录/正文范围、引用及低剧透标记，回传契约需求。",
+      "deliverables": "第二来源适配器契约、真实样例及独立性记录",
+      "acceptance": "存在豆瓣以外的独立观点材料；转载或单纯元数据不能充数。",
+      "verification": "相同转载、摘要与全文混淆、错影片、来源缺失及剧透片段。",
+      "depends_on": [
+        "C01",
+        "Y01"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C02-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-22",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C02",
+        "P02"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C03",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-23",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "复用规则排序并扩展自然语言/已看约束",
+      "steps": "复用movie_ranking和现有时长/年代/排除规则，补明确否定、跨源身份去重、服务端已看和0–3部不足；权重变更做同快照对比。",
+      "deliverables": "app/domain规则、推荐服务纯函数",
+      "acceptance": "既有规则测试不回退；新增硬条件违规为0；明确排除不被软心情覆盖；无匹配不凑数。",
+      "verification": "时长边界、同名ID、否定、未知标签、只剩1部和空集合。",
+      "depends_on": [
+        "C01",
+        "Y02"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C03-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-23",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C03",
+        "P03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C04",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-24",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "LangGraph主图与需求澄清",
+      "steps": "在现有规则服务外增加LangGraph请求级图、结构化理解和澄清；文字与点选冲突时确认，零文字点选可走规则分支；保留旧真实服务能力。",
+      "deliverables": "app/workflow、LLM解析、路由与状态",
+      "acceptance": "问题只问影响选择的条件；每个分支有终点；外部文本不修改工具权限。",
+      "verification": "需要/无需追问、模型失败、条件矛盾、缺配置与状态恢复。",
+      "depends_on": [
+        "C03",
+        "Y03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C04-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-24",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C04",
+        "P04"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C05",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-25",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "口碑综合、低剧透与输出校验",
+      "steps": "对证据包提取观点，整理共识/分歧/匹配解释；按需补查后统一校验，供API接入。",
+      "deliverables": "证据综合节点、最终校验器、提示词版本",
+      "acceptance": "陈述引用同片证据；模型虚构评分/URL被拒；不把样本观点说成全网共识。",
+      "verification": "引用错片/缺失、来源冲突、摘录范围、危险剧透和输出截断。",
+      "depends_on": [
+        "C02",
+        "Y04",
+        "C04"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C05-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-25",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C05",
+        "P05"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C06",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-26",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "反馈、记忆语义与图闭环",
+      "steps": "本次约束覆盖历史；区分已看/今天不想看/确认偏好；接入Y的偏好仓储和换一批。",
+      "deliverables": "反馈路由、记忆读取与提议语义",
+      "acceptance": "帮朋友找片不写成本人偏好；写长期偏好需明确确认；关闭记忆仍能完成。",
+      "verification": "跨会话、误记、覆盖冲突、撤销与记忆禁用路径。",
+      "depends_on": [
+        "C04",
+        "C05",
+        "Y03"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C06-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-26",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C06",
+        "P06"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C07",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-27",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 4,
+      "title": "图故障与引用/剧透回归",
+      "steps": "接预算账本、补查停止和最终降级；覆盖网页指令注入、模型输出错误及来源系统性失败。",
+      "deliverables": "工作流回归集、质量缺陷修复记录",
+      "acceptance": "所有执行能终止；严重引用/剧透问题清零；豆瓣全不可用不标核心通过。",
+      "verification": "工具超限、两源冲突、无证据、恶意网页、取消与超时。",
+      "depends_on": [
+        "C04",
+        "C05",
+        "C06",
+        "Y04"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C07-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-27",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C07",
+        "P07"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C08",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-28",
+      "phase": "实施",
+      "hours": 4,
+      "complexity_points": 3,
+      "title": "冻结任务评估与结果报告",
+      "steps": "复用已有推荐质量方向与排序基线，跑修订30条离线任务和受预算约束的真实子集；比较同片库来源顺序/规则、直接模型、无记忆方案，报告失败与成本。",
+      "deliverables": "evals结果、模型/提示词/数据版本、评估报告",
+      "acceptance": "未跑项目标pending；不以模型自评当真值；引用和严重剧透人工复核。",
+      "verification": "30条离线任务；建议每个真实比较方案最多10条，受实际额度约束。",
+      "depends_on": [
+        "C07",
+        "Y07",
+        "P07"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C08-Q",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-28",
+      "phase": "测试评审联调",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "当日回归、交叉评审与联调",
+      "steps": "1小时本模块回归/缺陷复现；0.5小时评审PionneerZ当日交付；0.5小时联合接口与主流程联调。已包含在每日6小时内。",
+      "deliverables": "测试结果、PR意见、联调记录和未解决缺陷",
+      "acceptance": "检查结果可复现；关键失败有负责人；不得以等待上游充当已完成工时。",
+      "verification": "运行当日适用检查；保留输入、预期、实际和trace_id。",
+      "depends_on": [
+        "C08",
+        "P08"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C09",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-29",
+      "phase": "交付",
+      "hours": 2,
+      "complexity_points": 1,
+      "title": "交付Agent与答辩说明",
+      "steps": "复核固定演示输入、图路径、真实证据与模型配置，形成架构和限制说明。",
+      "deliverables": "Agent演示脚本、架构说明、评估摘要",
+      "acceptance": "能解释规则/LLM边界和失败案例；不把目标指标写成已达到。",
+      "verification": "交付模型小样和固定图路径冒烟。",
+      "depends_on": [
+        "C08"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "C10",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-30",
+      "phase": "条件缓冲",
+      "hours": 4,
+      "complexity_points": null,
+      "title": "截止前缺陷缓冲与重验",
+      "steps": "只处理阻碍交付的已确认缺陷、数据验证或环境复现；按风险重新分配，不增加功能。",
+      "deliverables": "必要补丁、复验结果与版本记录",
+      "acceptance": "不得用缓冲新增非首版功能；核心源仍不可用时如实报告。",
+      "verification": "修复复现用例及最终主链冒烟。",
+      "depends_on": [
+        "C09"
+      ],
+      "status": "conditional",
+      "evidence": null
+    },
+    {
+      "id": "C11",
+      "owner": "2284266609-code",
+      "reviewer": "yimou408-spec",
+      "date": "2026-10-31",
+      "phase": "条件缓冲",
+      "hours": 4,
+      "complexity_points": null,
+      "title": "硬截止交付修复与封存",
+      "steps": "核对修复、跑最终冒烟并归档交付；如已交付可不启用该缓冲。",
+      "deliverables": "必要补丁、复验结果与版本记录",
+      "acceptance": "不得用缓冲新增非首版功能；核心源仍不可用时如实报告。",
+      "verification": "修复复现用例及最终主链冒烟。",
+      "depends_on": [
+        "C10"
+      ],
+      "status": "conditional",
+      "evidence": null
+    }
+  ],
+  "baseline_snapshot": {
+    "primary_commit": "8f9f4865ddb21ebabe8463eb1d5470e499c1328e",
+    "local_head": "c9ca4179fe8804ac272b883acc7cc4be5dcf22b8",
+    "primary_code_inspected": true,
+    "primary_tests_run_this_turn": false,
+    "working_tree_merged_with_primary": false,
+    "existing_modules": [
+      "web/app",
+      "scripts/movie_catalog.py",
+      "scripts/movie_ranking.py",
+      "scripts/movie_server.py",
+      "tests/test_movie_catalog.py",
+      "tests/test_movie_ranking.py"
+    ],
+    "new_core_gaps": [
+      "natural_language",
+      "douban_reviews",
+      "independent_review_source",
+      "langgraph",
+      "long_term_memory"
+    ]
+  }
+}

@@ -9,7 +9,7 @@ This repository is at S0: movie recommendation feasibility, contracts, and proto
 - `contracts/examples/`: shared synthetic requests and responses; `contracts/generated/`: exported JSON Schema and OpenAPI.
 - `data/s0/`: synthetic catalog, evaluation tasks, and pending-review TMDB query seeds.
 - `web/s0/index.html`: standalone interaction prototype.
-- `docs/s0/`: setup, interface specifications, data licensing, and acceptance records. Read `docs/开发计划.md` for scope and ownership.
+- `docs/s0/`: setup, interface specifications, data licensing, and acceptance records. Read `docs/限期开发实施计划_20261029.md` and `docs/三人开发任务台账.md` for current scope and ownership.
 
 ## Build, Test, and Development Commands
 
