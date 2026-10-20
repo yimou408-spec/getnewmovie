@@ -1,10 +1,10 @@
-"""Generate reviewable JSON schemas/OpenAPI from the same types the mock uses."""
+"""Generate reviewable JSON schemas/OpenAPI from the same types the real API uses."""
 import argparse
 import json
 from pathlib import Path
 
 from scripts.s0_contracts import RecommendationRequest, RecommendationResponse, ErrorResponse
-from scripts.s0_mock_server import app
+from scripts.movie_server import app
 
 ROOT = Path(__file__).resolve().parents[1]
 

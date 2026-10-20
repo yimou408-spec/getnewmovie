@@ -23,6 +23,8 @@
     "code": {
       "enum": [
         "UPSTREAM_TIMEOUT",
+        "UPSTREAM_UNAVAILABLE",
+        "UPSTREAM_RATE_LIMIT",
         "NOT_CONFIGURED",
         "NOT_FOUND",
         "INVALID_SCENARIO"
