@@ -7,8 +7,8 @@ from fastapi.responses import JSONResponse
 
 from scripts.movie_catalog import AppleCatalog, CatalogError, MOODS
 from scripts.movie_ranking import MOOD_CLUES, rank_movies
-from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, Movie,
-                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse)
+from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
+                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities)
 
 
 def create_app(catalog=None):
@@ -20,9 +20,10 @@ def create_app(catalog=None):
         return JSONResponse(status_code=exc.status, content=ErrorResponse(trace_id=uuid4().hex, data_mode="live",
             code=exc.code, message=exc.message, retryable=exc.status != 404).model_dump(mode="json"))
 
-    @app.get("/health")
+    @app.get("/health", response_model=HealthResponse)
     def health():
-        return {"service": "real-catalog", "provider": "Apple iTunes US", "synthetic_fallback": False, "cache_ttl_seconds": 1800}
+        return HealthResponse(service="real-catalog", provider="Apple iTunes US", synthetic_fallback=False,
+                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True))
 
     def find(mid):
         if not mid.startswith("itunes:"):

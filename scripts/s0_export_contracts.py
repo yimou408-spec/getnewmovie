@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.s0_contracts import RecommendationRequest, RecommendationResponse, ErrorResponse
+from scripts.s0_contracts import RecommendationRequest, RecommendationResponse, ErrorResponse, HealthResponse
 from scripts.movie_server import app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +14,7 @@ def documents():
         "recommendation-request.schema.json": RecommendationRequest.model_json_schema(),
         "recommendation-response.schema.json": RecommendationResponse.model_json_schema(),
         "error-response.schema.json": ErrorResponse.model_json_schema(),
+        "health-response.schema.json": HealthResponse.model_json_schema(),
         "openapi.json": app.openapi(),
     }
 
@@ -35,7 +36,7 @@ def main():
             path.write_text(expected, encoding="utf-8")
     if stale:
         parser.exit(1, "Stale contracts: " + ", ".join(stale) + "\n")
-    print("Contract check passed" if args.check else "Exported 4 contract files")
+    print("Contract check passed" if args.check else f"Exported {len(documents())} contract files")
 
 
 if __name__ == "__main__":

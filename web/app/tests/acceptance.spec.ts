@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-const screenshots = "../../docs/frontend/screenshots";
+const screenshots =
+  process.env.ACCEPTANCE_SCREENSHOT_DIR ?? "../../docs/frontend/screenshots";
 async function noOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -392,8 +393,11 @@ test("unknown identities and scope documentation remain explicit", async ({
   await page.goto("/film/itunes%3A1");
   await expect(page.getByRole("alert")).toContainText("影片");
   await page.goto("/about");
-  await expect(page.getByRole("table")).toContainText("Apple 美国区公开数据");
-  await expect(page.getByRole("table")).toContainText("尚未实现");
+  const scopeTable = page
+    .getByRole("region", { name: "页面功能与使用边界" })
+    .getByRole("table");
+  await expect(scopeTable).toContainText("Apple 美国区公开数据");
+  await expect(scopeTable).toContainText("尚未实现");
   await accessible(page);
   await page.goto("/unknown");
   await expect(

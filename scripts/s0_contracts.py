@@ -10,6 +10,25 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ServiceCapabilities(StrictModel):
+    """Implemented paths only, not a claim of upstream availability or quality."""
+    metadata: bool = False
+    ratings: bool = False
+    reviews: bool = False
+    natural_language: bool = False
+    long_term_memory: bool = False
+    local_availability: bool = False
+
+
+class HealthResponse(StrictModel):
+    service: str
+    provider: str
+    synthetic_fallback: bool
+    cache_ttl_seconds: int = Field(ge=0)
+    # Optional for compatibility with the previously deployed health response.
+    capabilities: ServiceCapabilities | None = None
+
+
 class Constraints(StrictModel):
     max_runtime_minutes: int | None = Field(default=None, ge=1, le=600)
     exclude_movie_ids: list[str] = Field(default_factory=list, max_length=500)

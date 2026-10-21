@@ -15,7 +15,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
               }
             }
           }
@@ -605,6 +607,46 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HealthResponse": {
+        "properties": {
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "synthetic_fallback": {
+            "type": "boolean",
+            "title": "Synthetic Fallback"
+          },
+          "cache_ttl_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Ttl Seconds"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceCapabilities"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service",
+          "provider",
+          "synthetic_fallback",
+          "cache_ttl_seconds"
+        ],
+        "title": "HealthResponse"
+      },
       "Movie": {
         "properties": {
           "movie_id": {
@@ -1043,6 +1085,44 @@
           "memory_used"
         ],
         "title": "RecommendationResponse"
+      },
+      "ServiceCapabilities": {
+        "properties": {
+          "metadata": {
+            "type": "boolean",
+            "title": "Metadata",
+            "default": false
+          },
+          "ratings": {
+            "type": "boolean",
+            "title": "Ratings",
+            "default": false
+          },
+          "reviews": {
+            "type": "boolean",
+            "title": "Reviews",
+            "default": false
+          },
+          "natural_language": {
+            "type": "boolean",
+            "title": "Natural Language",
+            "default": false
+          },
+          "long_term_memory": {
+            "type": "boolean",
+            "title": "Long Term Memory",
+            "default": false
+          },
+          "local_availability": {
+            "type": "boolean",
+            "title": "Local Availability",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ServiceCapabilities",
+        "description": "Implemented paths only, not a claim of upstream availability or quality."
       },
       "ValidationError": {
         "properties": {

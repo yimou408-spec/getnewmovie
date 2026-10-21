@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.s0_contracts import ErrorResponse, Movie, RecommendationRequest, RecommendationResponse
+from scripts.s0_contracts import ErrorResponse, HealthResponse, Movie, RecommendationRequest, RecommendationResponse
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def check_data():
     folder = ROOT / "contracts/examples"
     for path in folder.glob("*.json"):
-        model = RecommendationRequest if path.stem == "request" else ErrorResponse if path.stem in ("timeout", "unconfigured") else RecommendationResponse
+        models = {"request": RecommendationRequest, "health": HealthResponse,
+                  "timeout": ErrorResponse, "unconfigured": ErrorResponse}
+        model = models.get(path.stem, RecommendationResponse)
         model.model_validate_json(path.read_text(encoding="utf-8"))
     tasks = json.loads((ROOT / "data/s0/eval_tasks.json").read_text(encoding="utf-8"))
     if len(tasks) != 30 or len({task["task_id"] for task in tasks}) != 30:

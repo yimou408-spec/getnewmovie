@@ -32,7 +32,6 @@ import {
   ShieldCheck,
   Sparkles,
   X,
-  CircleAlert,
   ExternalLink,
   Monitor,
   Moon,
@@ -56,6 +55,8 @@ import {
   type Recommendation,
   type SearchResponse,
 } from "./domain";
+import { ErrorNotice } from "./request-feedback";
+import { ServiceStatus } from "./service-status";
 
 const initialDrafts: Record<Mode, string> = {
   discover: "",
@@ -219,24 +220,6 @@ function Empty({
     </div>
   );
 }
-function ErrorNotice({ error, retry }: { error: Error; retry?: () => void }) {
-  return (
-    <div role="alert" className="notice error">
-      <CircleAlert aria-hidden="true" />
-      <div>
-        <strong>{error.message}</strong>
-        {error instanceof ApiError && error.trace && (
-          <small>请求编号：{error.trace}</small>
-        )}
-        {retry && (
-          <Button className="quiet" onClick={retry}>
-            重新尝试
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
 function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "timeout"
@@ -379,6 +362,8 @@ export default function App() {
   const [comparison, setComparison] = useState<Movie[]>([]);
   const [result, setResult] = useState<Recommendation>();
   const [snapshotQuery, setSnapshotQuery] = useState("");
+  const [cancelled, setCancelled] = useState(false);
+  const activeRequest = useRef<AbortController | null>(null);
   const [formError, setFormError] = useState<Error>();
   const [message, setMessage] = useState("");
   const [clarificationCount, setClarificationCount] = useState(0);
@@ -399,6 +384,9 @@ export default function App() {
   const [pathKey, setPathKey] = useState(location.pathname);
   useEffect(() => {
     if (pathKey !== location.pathname) {
+      activeRequest.current?.abort();
+      activeRequest.current = null;
+      recommend.reset();
       setPathKey(location.pathname);
       setMessage("");
       setUndo(undefined);
@@ -410,14 +398,23 @@ export default function App() {
     document.title = `${location.pathname === "/compare" ? "影片对比" : location.pathname === "/watchlist" ? "本次片单" : location.pathname === "/preferences" ? "偏好与隐私" : location.pathname === "/about" ? "关于与接入状态" : location.pathname.startsWith("/film/") ? "影片资料" : "今晚看什么"} · 私人选片室`;
   }, [location.pathname]);
   const recommend = useMutation({
-    mutationFn: async (body: ReturnType<typeof buildRequest>) =>
-      validateResponse(
+    mutationFn: async (body: ReturnType<typeof buildRequest>) => {
+      activeRequest.current?.abort();
+      const controller = new AbortController();
+      activeRequest.current = controller;
+      const data = validateResponse(
         await api("/recommendations", {
           method: "POST",
           body: JSON.stringify(body),
+          signal: controller.signal,
         }),
-      ),
-    onSuccess: (data, body) => {
+      );
+      return { data, controller };
+    },
+    onSuccess: ({ data, controller }, body) => {
+      if (activeRequest.current !== controller || controller.signal.aborted)
+        return;
+      setCancelled(false);
       setResult(data);
       setSnapshotQuery(body.query);
       setHidden([]);
@@ -430,6 +427,22 @@ export default function App() {
       });
     },
   });
+  useEffect(() => () => activeRequest.current?.abort(), []);
+  function startRecommendation(body: ReturnType<typeof buildRequest>) {
+    setCancelled(false);
+    setMessage("");
+    recommend.mutate(body);
+  }
+  function cancelRecommendation() {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    recommend.reset();
+    setCancelled(true);
+    setMessage(
+      "已取消本次请求，上一批结果仍保留。取消只停止本页面等待，不保证上游任务已停止。",
+    );
+    discoverRef.current?.focus();
+  }
   function submit(
     event?: FormEvent,
     discovery?: {
@@ -473,7 +486,7 @@ export default function App() {
         sort_by: sortBy,
         era,
       };
-      recommend.mutate(body);
+      startRecommendation(body);
     } catch (e) {
       setFormError(e as Error);
       resultsRef.current?.focus();
@@ -1184,7 +1197,7 @@ export default function App() {
                   <div className="section-heading">
                     <h2 id="results-title">
                       {result
-                        ? recommend.isError || recommend.isPending
+                        ? recommend.isError || recommend.isPending || cancelled
                           ? "上次候选结果"
                           : "你的候选电影"
                         : "把今晚留给合适的一部"}
@@ -1211,6 +1224,12 @@ export default function App() {
                       <div className="skeleton" />
                       <p>正在从真实片库匹配电影…</p>
                       <small>不会自动重复请求。</small>
+                      <Button
+                        className="secondary"
+                        onClick={cancelRecommendation}
+                      >
+                        取消本次请求
+                      </Button>
                     </div>
                   )}
                   {result && (
@@ -1301,7 +1320,7 @@ export default function App() {
                           onClick={() => {
                             const previous = recommend.variables;
                             if (previous)
-                              recommend.mutate({
+                              startRecommendation({
                                 ...previous,
                                 constraints: {
                                   company: "",
@@ -1827,7 +1846,8 @@ function FilmPage({
   const existing = candidates.find((c) => c.movie.movie_id === movieId);
   const query = useQuery({
     queryKey: ["film", movieId],
-    queryFn: () => api<Movie>(`/movies/${encodeURIComponent(movieId!)}`),
+    queryFn: ({ signal }) =>
+      api<Movie>(`/movies/${encodeURIComponent(movieId!)}`, { signal }),
     enabled: !existing,
     staleTime: 60000,
   });
@@ -1853,7 +1873,7 @@ function FilmPage({
       <div className="notice">
         <Info />
         <span>
-          当前接口未提供剧情简介、演职员与海报。页面不补造影片内容；观看渠道需要独立核实。
+          当前资料包含来源提供的导演、海报等字段，缺失项保持未知；口碑评分、影评与本地观看渠道尚未接入。
         </span>
       </div>
     </>
@@ -1871,10 +1891,11 @@ function Compare({
   const ids = movies.map((m) => m.movie_id);
   const query = useQuery({
     queryKey: ["compare", ...ids],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api<SearchResponse>("/comparisons", {
         method: "POST",
         body: JSON.stringify({ movie_ids: ids }),
+        signal,
       }),
     enabled: ids.length >= 2,
     staleTime: 60000,
@@ -2009,10 +2030,12 @@ function About() {
           30 分钟，保留采集时间。
         </p>
       </div>
+      <ServiceStatus />
+      <h2 className="section-heading">页面功能与使用边界</h2>
       <div
         className="table-scroll"
         role="region"
-        aria-label="能力接入状态"
+        aria-label="页面功能与使用边界"
         tabIndex={0}
       >
         <table className="capabilities">
@@ -2027,7 +2050,7 @@ function About() {
             {[
               [
                 "影片查找与身份确认",
-                "真实资料可用",
+                "按资料源查找",
                 "按来源原文片名检索并确认年份，最多 50 条。商店搜索无电影结果时查当前分类榜单；未覆盖的影片可能查不到。推荐候选仍来自分类榜单。",
               ],
               [
@@ -2046,7 +2069,7 @@ function About() {
                 "片单与排除影片保存在页面内存；排除会传入后续选片条件，支持撤销。刷新清空，不保存长期偏好。",
               ],
               [
-                "海报与评分",
+                "来源海报",
                 "海报已接入",
                 "使用来源海报并链接对应商店。评分、影评与剧情总结尚未接入。",
               ],

@@ -247,6 +247,18 @@ export interface components {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** HealthResponse */
+    HealthResponse: {
+      /** Service */
+      service: string;
+      /** Provider */
+      provider: string;
+      /** Synthetic Fallback */
+      synthetic_fallback: boolean;
+      /** Cache Ttl Seconds */
+      cache_ttl_seconds: number;
+      capabilities?: components["schemas"]["ServiceCapabilities"] | null;
+    };
     /** Movie */
     Movie: {
       /** Movie Id */
@@ -387,6 +399,42 @@ export interface components {
       /** Matched Count */
       matched_count?: number | null;
     };
+    /**
+     * ServiceCapabilities
+     * @description Implemented paths only, not a claim of upstream availability or quality.
+     */
+    ServiceCapabilities: {
+      /**
+       * Metadata
+       * @default false
+       */
+      metadata: boolean;
+      /**
+       * Ratings
+       * @default false
+       */
+      ratings: boolean;
+      /**
+       * Reviews
+       * @default false
+       */
+      reviews: boolean;
+      /**
+       * Natural Language
+       * @default false
+       */
+      natural_language: boolean;
+      /**
+       * Long Term Memory
+       * @default false
+       */
+      long_term_memory: boolean;
+      /**
+       * Local Availability
+       * @default false
+       */
+      local_availability: boolean;
+    };
     /** ValidationError */
     ValidationError: {
       /** Location */
@@ -424,7 +472,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["HealthResponse"];
         };
       };
     };

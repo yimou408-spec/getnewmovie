@@ -1,0 +1,14 @@
+{
+  "service": "real-catalog",
+  "provider": "Apple iTunes US",
+  "synthetic_fallback": false,
+  "cache_ttl_seconds": 1800,
+  "capabilities": {
+    "metadata": true,
+    "ratings": false,
+    "reviews": false,
+    "natural_language": false,
+    "long_term_memory": false,
+    "local_availability": false
+  }
+}

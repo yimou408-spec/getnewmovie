@@ -54,8 +54,14 @@
       "acceptance": "现有点选、比较、片单与明暗主题保留；明确新增自然语言、证据和记忆交互。",
       "verification": "核对S0六类状态；记录环境版本。",
       "depends_on": [],
-      "status": "not_started",
-      "evidence": null
+      "status": "ready_for_review",
+      "evidence": "docs/frontend/p01-20261021.md",
+      "updated_on": "2026-10-21",
+      "completion_note": "现状清点与六状态回归已交付，待主审。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "计划工时保留；实际个人投入未知，自动执行与外部等待不按人时计。",
+      "blockers": []
     },
     {
       "id": "P01",
@@ -74,8 +80,16 @@
         "P00",
         "Y00"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "implementation_ready_pending_integration",
+      "evidence": "docs/frontend/p01-20261021.md",
+      "updated_on": "2026-10-21",
+      "completion_note": "请求、取消、能力声明与生成契约已实现并自测，待 Y00 契约确认及主审。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "计划工时保留；实际个人投入未知，自动执行与外部等待不按人时计。",
+      "blockers": [
+        "Y00 契约差异交付未见；capabilities 增量需 Y00/Y02 复核。"
+      ]
     },
     {
       "id": "P01-Q",
@@ -94,8 +108,16 @@
         "P01",
         "Y01"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "partially_completed",
+      "evidence": "docs/frontend/p01-20261021.md",
+      "updated_on": "2026-10-21",
+      "completion_note": "自身回归通过；Y01 交叉评审及联合联调待上游交付。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "计划工时保留；实际个人投入未知，自动执行与外部等待不按人时计。",
+      "blockers": [
+        "未见 Y00/Y01 开放交付 PR，无法完成真实交叉评审与联合联调。"
+      ]
     },
     {
       "id": "P02",
