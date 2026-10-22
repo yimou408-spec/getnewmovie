@@ -26,8 +26,10 @@ def main():
                 assert m["ratings"] == []
                 if constraints.get("genres"):
                     assert set(m["genres"]) & set(constraints["genres"])
-                if constraints.get("moods"):
+                if constraints.get("moods") and not constraints.get("genres"):
                     assert set(m["genres"]) & set().union(*(MOODS[x] for x in constraints["moods"]))
+                if constraints.get("moods"):
+                    assert data["interpretation"]["soft_preferences"]
                 if constraints.get("max_runtime_minutes"):
                     assert 0 < m["runtime_minutes"] <= constraints["max_runtime_minutes"]
                 assert m["movie_id"] not in constraints.get("exclude_movie_ids", [])
@@ -44,7 +46,7 @@ def main():
         recommend({"moods": [mood]})
     for duration in [90, 120, 150]:
         recommend({"max_runtime_minutes": duration})
-    assert recommend({"genres": ["恐怖"], "moods": ["感动一下"]})["status"] == "empty"
+    recommend({"genres": ["剧情"], "moods": ["温暖治愈"], "max_runtime_minutes": 120})
     for order in ["balanced", "popular"]:
         base = recommend({"sort_by": order})
         excluded = [c["movie"]["movie_id"] for c in base["candidates"]]

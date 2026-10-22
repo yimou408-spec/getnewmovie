@@ -184,6 +184,12 @@ test("mood, genre and duration change real candidates; empty is honest", async (
     .getByRole("group", { name: "想看哪种故事？" })
     .getByRole("button", { name: "恐怖", exact: true })
     .click();
+  // A mood is soft: it must not intersect away an explicit genre.
+  const horror = await submit(page, "看看候选电影");
+  expect(horror.candidates.length).toBeGreaterThan(0);
+  for (const c of horror.candidates) expect(c.movie.genres).toContain("恐怖");
+  await page.getByText("精确时长与观看地区（可选）", { exact: true }).click();
+  await page.getByLabel("最多看多久", { exact: false }).fill("1");
   const empty = await submit(page, "看看候选电影");
   expect(empty.status).toBe("empty");
   await expect(

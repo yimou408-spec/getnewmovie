@@ -65,8 +65,6 @@ def create_app(catalog=None):
                     continue
                 if c.genres and not genres.intersection(c.genres):
                     continue
-                if body.input_source != "natural_language" and mood_genres and not genres.intersection(mood_genres):
-                    continue
                 if c.company == "和家人" and not genres.intersection({"家庭", "动画"}):
                     continue
                 if c.max_runtime_minutes is not None and (movie.runtime_minutes is None or movie.runtime_minutes > c.max_runtime_minutes):
@@ -89,7 +87,7 @@ def create_app(catalog=None):
                 match = [f"类型符合：{'、'.join(c.genres)}。"] if c.genres else []
                 if c.moods:
                     clues = set().union(*(MOOD_CLUES[m] for m in c.moods)) & set(movie.tags)
-                    match.append(f"简介词法线索：{'、'.join(sorted(clues))}；用于「{'、'.join(c.moods)}」匹配推断。" if clues else f"类型接近「{'、'.join(c.moods)}」，简介缺少明确的心情线索，感受待确认。")
+                    match.append(f"简介词法线索：{'、'.join(sorted(clues))}；用于「{'、'.join(c.moods)}」匹配推断。" if clues else f"简介缺少「{'、'.join(c.moods)}」的明确线索，心情匹配待确认。")
                 if c.max_runtime_minutes:
                     match.append(f"{movie.runtime_minutes} 分钟，不超过你的 {c.max_runtime_minutes} 分钟上限。")
                 if not match:
@@ -107,7 +105,7 @@ def create_app(catalog=None):
                     caveats=caveats,
                     availability=[Availability(region=body.region, status="unknown")]))
             warnings = ["范围：Apple 美国区当前分类榜单；片名沿用来源原文。评分及所选地区播放渠道未接入。",
-                        ("类型、片长、年代和排除是硬条件；心情只辅助召回与排序，未知字段不进入对应限定结果。" if body.input_source == "natural_language" else "类型与心情类别先交叉筛选；片长、年代、排除影片是硬条件，未知字段不进入对应限定结果。"),
+                        "类型、片长、年代和排除是硬条件；心情只辅助召回与排序，未知字段不进入对应限定结果。",
                         "排序：来源顺序，不代表口碑或适合程度。" if c.sort_by == "popular" else "排序：均衡探索。简介关键词辅助心情匹配，并分散类型和导演；无偏好时降低恐怖类别优先级。这不是评分或个人喜爱概率。"]
             if c.company:
                 warnings.append("和家人会限定家庭/动画类别，仍需自行核对适龄；其他同行选项仅记录本次情境，不影响排序。")
@@ -118,7 +116,7 @@ def create_app(catalog=None):
             elif body.query and ("补充：" in body.query or body.mode != "discover"):
                 warnings.append("补充文字暂不参与匹配；当前使用点选条件和已确认影片。")
             if not eligible:
-                warnings.insert(0, f"当前查得的 {len(films)} 部影片没有符合全部条件的结果。请放宽时长、减少心情或类型条件；不会用样例补齐。")
+                warnings.insert(0, f"当前查得的 {len(films)} 部影片没有符合全部条件的结果。请放宽时长、年代或类型条件；不会用样例补齐。")
             return RecommendationResponse(trace_id=uuid4().hex, data_mode="cached" if before == catalog.fetch_count else "live", status="ready" if candidates else "empty",
                 candidates=candidates, evidence=evidence, questions=[], warnings=warnings, memory_used=False, catalog_size=len(films), matched_count=len(eligible), interpretation=interpretation)
 
