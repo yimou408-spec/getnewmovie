@@ -99,6 +99,7 @@ test("real catalog, artwork, sources, watchlist and comparison", async ({
     page.locator('.candidate-grid a[href*="itunes.apple.com"]').first(),
   ).toHaveAttribute("href", /^https:\/\/itunes.apple.com\//);
   await accessible(page);
+  await page.getByRole("button", { name: "关闭来源面板" }).click();
   await noOverflow(page);
   await page.locator(".intro").scrollIntoViewIfNeeded();
   await page.screenshot({

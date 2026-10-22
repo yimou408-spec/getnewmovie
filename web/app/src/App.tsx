@@ -57,6 +57,12 @@ import {
 } from "./domain";
 import { ErrorNotice } from "./request-feedback";
 import { ServiceStatus } from "./service-status";
+import { EvidencePanel, Ratings, SourceOpinions } from "./evidence";
+import {
+  reasonLabels,
+  snapshotForComparison,
+  type ComparedMovie,
+} from "./evidence-model";
 
 const initialDrafts: Record<Mode, string> = {
   discover: "",
@@ -359,7 +365,7 @@ export default function App() {
   const [region, setRegion] = useState("CN");
   const [selected, setSelected] = useState<Movie>();
   const [saved, setSaved] = useState<Movie[]>([]);
-  const [comparison, setComparison] = useState<Movie[]>([]);
+  const [comparison, setComparison] = useState<ComparedMovie[]>([]);
   const [result, setResult] = useState<Recommendation>();
   const [resultRequest, setResultRequest] =
     useState<ReturnType<typeof buildRequest>>();
@@ -381,7 +387,7 @@ export default function App() {
   const [era, setEra] = useState<"any" | "recent" | "2000s" | "classic">("any");
   const [undo, setUndo] = useState<{
     saved?: Movie[];
-    comparison?: Movie[];
+    comparison?: ComparedMovie[];
     selected?: Movie;
   }>();
   const resultsRef = useRef<HTMLElement>(null);
@@ -624,7 +630,10 @@ export default function App() {
         current.filter((m) => m.movie_id !== movie.movie_id),
       );
     else if (comparison.length < 3)
-      setComparison((current) => [...current, movie]);
+      setComparison((current) => [
+        ...current,
+        snapshotForComparison(movie, result),
+      ]);
     else setMessage("最多对比 3 部影片，请先移除一部。");
   }
   const actions = (movie: Movie) => (
@@ -703,13 +712,7 @@ export default function App() {
                 </span>
                 <p>{candidate.reason.text}</p>
                 <small>
-                  {
-                    {
-                      metadata_fact: "影片资料",
-                      source_opinion: "来源观点",
-                      matching_inference: "匹配推断",
-                    }[candidate.reason.kind]
-                  }
+                  {reasonLabels[candidate.reason.kind]} · 不等同于观众口碑
                 </small>
               </div>
               <div className="caveats">
@@ -723,7 +726,7 @@ export default function App() {
                   <p key={i}>待确认：{c}</p>
                 ))}
               </div>
-              <Ratings movie={movie} />
+              <Ratings movie={movie} evidence={result?.evidence} />
               <Availability candidate={candidate} />
             </>
           ) : (
@@ -735,25 +738,12 @@ export default function App() {
           <div className="movie-actions">{actions(movie)}</div>
           {candidate && (
             <>
-              <details className="sources">
-                <summary>核对理由与来源</summary>
-                {result!.evidence
-                  .filter((e) =>
-                    candidate.reason.evidence_ids.includes(e.evidence_id),
-                  )
-                  .map((e) => (
-                    <div className="source" key={e.evidence_id}>
-                      <strong>{e.source}</strong>
-                      <p>
-                        {e.spoiler_level === "safe"
-                          ? e.claim
-                          : "来源可能包含剧透，暂不展示内容。"}
-                      </p>
-                      <small>采集时间：{e.retrieved_at}</small>
-                      <SourceLink url={e.url}>查看来源</SourceLink>
-                    </div>
-                  ))}
-              </details>
+              <EvidencePanel
+                movie={movie}
+                candidate={candidate}
+                evidence={result?.evidence ?? []}
+                dataMode={result?.data_mode}
+              />
               <Button
                 className="text-button"
                 onClick={() => {
@@ -1668,13 +1658,7 @@ export default function App() {
           />
           <Route
             path="/compare"
-            element={
-              <Compare
-                movies={comparison}
-                candidates={knownCandidates}
-                onRemove={compare}
-              />
-            }
+            element={<Compare movies={comparison} onRemove={compare} />}
           />
           <Route
             path="/film/:movieId"
@@ -1848,32 +1832,6 @@ function PageHeading({ title, subtitle }: { title: string; subtitle: string }) {
       </Link>
       <h1>{title}</h1>
       <p>{subtitle}</p>
-    </div>
-  );
-}
-function Ratings({ movie }: { movie: Movie }) {
-  return (
-    <div className="ratings">
-      {(movie.ratings ?? []).length ? (
-        (movie.ratings ?? []).map((r, i) => (
-          <div key={i}>
-            <strong>
-              {r.value}
-              <small> / {r.scale}</small>
-            </strong>
-            <span>{r.source}</span>
-            <small>
-              {r.vote_count == null
-                ? "票数未提供"
-                : `${r.vote_count.toLocaleString("zh-CN")} 票`}
-            </small>
-          </div>
-        ))
-      ) : (
-        <p>
-          评分：未获取<span>缺少评分不代表评分低</span>
-        </p>
-      )}
     </div>
   );
 }
@@ -2106,11 +2064,9 @@ function FilmPage({
 }
 function Compare({
   movies,
-  candidates,
   onRemove,
 }: {
-  movies: Movie[];
-  candidates: Candidate[];
+  movies: ComparedMovie[];
   onRemove: (m: Movie) => void;
 }) {
   const ids = movies.map((m) => m.movie_id);
@@ -2152,7 +2108,7 @@ function Compare({
           <div className="notice">
             <Info />
             <span>
-              对比接口仅提供基础资料。推荐理由沿用本次已有结果；未获取的评分和渠道保持未知。
+              基础资料由对比接口提供。推荐与证据沿用加入对比时的快照，未获取的评分和渠道保持未知。不同影片的来源观点并列展示，不生成未经证实的差异结论。
             </span>
           </div>
           {query.data && (
@@ -2197,14 +2153,17 @@ function Compare({
                       "标签",
                       "评分",
                       "推荐理由",
+                      "来源观点",
+                      "证据与出处",
                       "观看渠道",
                     ].map((row, i) => (
                       <tr key={row}>
                         <th scope="row">{row}</th>
                         {query.data!.movies.map((m) => {
-                          const c = candidates.find(
-                            (c) => c.movie.movie_id === m.movie_id,
-                          );
+                          const snapshot = movies.find(
+                            (selected) => selected.movie_id === m.movie_id,
+                          )?.snapshot;
+                          const c = snapshot?.candidate;
                           return (
                             <td key={m.movie_id}>
                               {i === 0 ? (
@@ -2216,9 +2175,34 @@ function Compare({
                               ) : i === 3 ? (
                                 (m.tags ?? []).join(" / ") || "未提供"
                               ) : i === 4 ? (
-                                <Ratings movie={c?.movie ?? m} />
+                                <Ratings
+                                  movie={c?.movie ?? m}
+                                  evidence={snapshot?.evidence}
+                                />
                               ) : i === 5 ? (
-                                (c?.reason.text ?? "本次尚未获取")
+                                c ? (
+                                  <>
+                                    <small className="muted">
+                                      {reasonLabels[c.reason.kind]}
+                                    </small>
+                                    <p>{c.reason.text}</p>
+                                  </>
+                                ) : (
+                                  "本次尚未获取"
+                                )
+                              ) : i === 6 ? (
+                                <SourceOpinions
+                                  movie={m}
+                                  evidence={snapshot?.evidence ?? []}
+                                />
+                              ) : i === 7 ? (
+                                <EvidencePanel
+                                  movie={c?.movie ?? m}
+                                  candidate={c}
+                                  evidence={snapshot?.evidence ?? []}
+                                  dataMode={snapshot?.dataMode}
+                                  snapshot={Boolean(snapshot)}
+                                />
                               ) : c ? (
                                 <Availability candidate={c} />
                               ) : (

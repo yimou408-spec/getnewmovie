@@ -19,6 +19,9 @@ export function validateResponse(raw: unknown): Recommendation {
   if (!responseValid(raw))
     throw new Error("服务返回的数据与接口约定不一致，请重试。");
   const ids = new Set(raw.candidates.map((c) => c.movie.movie_id));
+  const evidence = new Map(raw.evidence.map((e) => [e.evidence_id, e]));
+  if (evidence.size !== raw.evidence.length)
+    throw new Error("来源证据编号重复，无法核对出处。");
   if (
     ids.size !== raw.candidates.length ||
     (raw.status === "ready" && !ids.size) ||
@@ -31,7 +34,10 @@ export function validateResponse(raw: unknown): Recommendation {
   for (const c of raw.candidates) {
     if (c.movie.ratings?.some((r) => r.value > r.scale))
       throw new Error("评分超出了来源量表。");
-    for (const id of c.reason.evidence_ids) {
+    for (const id of [
+      ...c.reason.evidence_ids,
+      ...(c.movie.ratings ?? []).map((r) => r.evidence_id),
+    ]) {
       if (
         !raw.evidence.some(
           (e) =>
@@ -42,6 +48,12 @@ export function validateResponse(raw: unknown): Recommendation {
       )
         throw new Error("推荐理由缺少可核对的安全来源。");
     }
+    if (
+      c.movie.ratings?.some(
+        (r) => evidence.get(r.evidence_id)?.source !== r.source,
+      )
+    )
+      throw new Error("评分平台与引用来源不一致。");
   }
   return raw;
 }

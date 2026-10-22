@@ -1168,12 +1168,15 @@ main:focus-visible .intro h1 {
   gap: 16px;
   padding: 12px 0;
   font-size: 13px;
+  flex-wrap: wrap;
 }
 .ratings > div {
   display: flex;
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .ratings strong {
   font-size: 22px;
@@ -2141,6 +2144,7 @@ footer > a {
   .movie-body > .availability,
   .movie-body > .movie-actions,
   .movie-body > .sources,
+  .movie-body > .evidence-panel,
   .movie-body > .text-button {
     margin-left: -100px;
   }
