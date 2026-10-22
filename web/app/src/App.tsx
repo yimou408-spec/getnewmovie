@@ -361,6 +361,8 @@ export default function App() {
   const [saved, setSaved] = useState<Movie[]>([]);
   const [comparison, setComparison] = useState<Movie[]>([]);
   const [result, setResult] = useState<Recommendation>();
+  const [resultRequest, setResultRequest] =
+    useState<ReturnType<typeof buildRequest>>();
   const [snapshotQuery, setSnapshotQuery] = useState("");
   const [cancelled, setCancelled] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
@@ -416,6 +418,7 @@ export default function App() {
         return;
       setCancelled(false);
       setResult(data);
+      setResultRequest(body);
       setSnapshotQuery(body.query);
       setHidden([]);
       requestAnimationFrame(() => {
@@ -460,6 +463,8 @@ export default function App() {
       setMode("discover");
       setPreferences(chosen);
       setRuntime(discovery.runtime);
+      setEra("any");
+      setSortBy("balanced");
       setDrafts((current) => ({ ...current, discover: discovery.note ?? "" }));
     }
     try {
@@ -483,8 +488,8 @@ export default function App() {
         company: "",
         ...body.constraints,
         exclude_movie_ids: dismissed,
-        sort_by: sortBy,
-        era,
+        sort_by: discovery ? "balanced" : sortBy,
+        era: discovery ? "any" : era,
       };
       startRecommendation(body);
     } catch (e) {
@@ -1318,7 +1323,7 @@ export default function App() {
                           className="secondary"
                           disabled={recommend.isPending}
                           onClick={() => {
-                            const previous = recommend.variables;
+                            const previous = resultRequest;
                             if (previous)
                               startRecommendation({
                                 ...previous,
@@ -1716,10 +1721,21 @@ function MovieLookup({
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("");
   const [searched, setSearched] = useState(false);
+  const activeSearch = useRef<AbortController | null>(null);
+  const invalidYear =
+    Boolean(year) &&
+    (!Number.isInteger(Number(year)) ||
+      Number(year) < 1888 ||
+      Number(year) > 2200);
   const search = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (input: {
+      query: string;
+      year: string;
+      controller: AbortController;
+    }) => {
       const data = await api<SearchResponse>(
-        `/movies?query=${encodeURIComponent(query.trim())}${year ? `&year=${year}` : ""}`,
+        `/movies?query=${encodeURIComponent(input.query)}${input.year ? `&year=${input.year}` : ""}`,
+        { signal: input.controller.signal },
       );
       if (
         !Array.isArray(data.movies) ||
@@ -1729,10 +1745,19 @@ function MovieLookup({
       return data;
     },
   });
+  useEffect(() => () => activeSearch.current?.abort(), []);
+  const invalidateSearch = () => {
+    activeSearch.current?.abort();
+    activeSearch.current = null;
+    search.reset();
+    setSearched(false);
+  };
   const run = () => {
-    if (query.trim() && !search.isPending) {
+    if (query.trim() && !invalidYear && !search.isPending) {
+      const controller = new AbortController();
+      activeSearch.current = controller;
       setSearched(true);
-      search.mutate();
+      search.mutate({ query: query.trim(), year, controller });
     }
   };
   return (
@@ -1747,9 +1772,9 @@ function MovieLookup({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setSearched(false);
+              invalidateSearch();
             }}
-            placeholder="试试：春日来信"
+            placeholder="输入来源原文片名"
             maxLength={100}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -1770,24 +1795,32 @@ function MovieLookup({
             min="1888"
             max="2200"
             value={year}
+            aria-invalid={invalidYear || undefined}
+            aria-describedby={
+              invalidYear ? `year-error-${chooseLabel}` : undefined
+            }
             onChange={(e) => {
               setYear(e.target.value);
-              setSearched(false);
+              invalidateSearch();
             }}
             placeholder="如 2024"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                run();
+              }
+            }}
           />
+          {invalidYear && (
+            <small id={`year-error-${chooseLabel}`} role="alert">
+              年份请输入 1888–2200 之间的整数。
+            </small>
+          )}
         </div>
         <Button
           type="button"
           className="secondary"
-          disabled={
-            !query.trim() ||
-            search.isPending ||
-            (!!year &&
-              (Number(year) < 1888 ||
-                Number(year) > 2200 ||
-                !Number.isInteger(Number(year))))
-          }
+          disabled={!query.trim() || search.isPending || invalidYear}
           onClick={run}
         >
           <Search size={16} />
@@ -1807,7 +1840,7 @@ function MovieLookup({
               ? search.data.requires_confirmation
                 ? "找到同名影片，请确认具体年份。"
                 : "请核对影片后确认。"
-              : "没有找到影片。试试“春日来信”或“远星航线”。"}
+              : "没有找到影片。请核对来源原文片名，或清空年份后重试；当前仅检索 Apple 美国区分类榜单。"}
           </p>
           {search.data.movies.map((m) => (
             <div className="lookup-item" key={m.movie_id}>

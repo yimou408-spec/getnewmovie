@@ -106,7 +106,13 @@ export function buildRequest(
     throw new Error("时长请输入 1–600 分钟的整数。");
   const request: Request = {
     mode,
-    query: query.trim(),
+    query:
+      query.trim() ||
+      (mode === "known_movie"
+        ? "查看这部已确认影片的资料与匹配结果。"
+        : mode === "watchlist"
+          ? "从本次片单中选择电影。"
+          : ""),
     region,
     session_id: "frontend-session",
     memory_enabled: false,
