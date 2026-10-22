@@ -58,6 +58,7 @@
 - 503、延迟、取消与海报故障采用显式故障注入；S0 六状态为明确标注的离线契约样例，没有作为生产推荐回退。
 - TDD 证据：新增换组/清空/检索指导用例及可选文字单测先失败，再修复通过。新增测试的定位名称和开发模式重复请求故障注入曾有测试脚本问题，已修正，不把中止运行计为整套通过。
 - 原始本机日志位于忽略目录 `artifacts/audit-20261022/`：`red.log`、`red-unit.log`、`red-search-actual.log`、`targeted.log`、`retry-targeted.log`、`checks.log`、`e2e.log`。云端结果以更新提交对应的 GitHub Actions 为准。
+- 首轮云端 [39740873350](https://github.com/yimou408-spec/getnewmovie/actions/runs/39740873350) 为 127 通过、5 失败，不能记为通过。下载的失败 trace/截图均显示真实资料源每分钟请求预算已满；冷启动集中查空片名会请求各分类榜单，随后场景请求也受到保护。补充后的按钮用例仅对明确 `UPSTREAM_RATE_LIMIT` 校验页面错误、等待 61 秒后通过“重新尝试”重试一次；其他错误和第二次失败仍失败，不提高来源限额、不重跑整个测试掩盖错误。补充后本机四组按钮回归 **56/56 通过（2.5 分钟）**，日志 `quota-targeted.log` 记录了实际限流后的页面重试恢复；新提交云端完整结果见 PR。
 - 四组实际结果截图已逐一查看：`artifacts/audit-20261022/screenshots/{desktop-light,desktop-dark,mobile-light,mobile-dark}-result-viewport.png`。桌面三列、手机单列，文字与操作无横向裁切；主题覆盖整个页面。云端工作流的 `frontend-acceptance` 附件另保留页面截图与失败诊断。
 
 复验：在 `web/app` 安装依赖后运行 `npm run format:check`、`npm test`、`npm run types:check`、`npm run build`、`npm run test:e2e`。Playwright 使用项目配置的原后端入口；本地需提供 `PYTHON` 指向已安装依赖的 Python，云端工作流已配置。

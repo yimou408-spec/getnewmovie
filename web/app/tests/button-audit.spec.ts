@@ -1,4 +1,28 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Response } from "@playwright/test";
+
+async function realSourceResponse(page: Page, response: Response) {
+  if (
+    response.status() === 503 &&
+    (await response.json()).code === "UPSTREAM_RATE_LIMIT"
+  ) {
+    test.setTimeout(180000);
+    await expect(page.getByRole("alert")).toContainText(/一分钟后重试/);
+    console.info(
+      "Real provider quota reached; respecting the minute window before one UI retry.",
+    );
+    await page.waitForTimeout(61000);
+    const retry = page.waitForResponse(
+      (r) =>
+        r.url() === response.url() &&
+        r.request().method() === response.request().method(),
+      { timeout: 15000 },
+    );
+    await page.getByRole("button", { name: "重新尝试", exact: true }).click();
+    response = await retry;
+  }
+  expect(response.status(), await response.text()).toBe(200);
+  return response;
+}
 
 async function recommend(page: Page, name = "什么都行，直接看看") {
   const response = page.waitForResponse(
@@ -8,8 +32,7 @@ async function recommend(page: Page, name = "什么都行，直接看看") {
     { timeout: 15000 },
   );
   await page.getByRole("button", { name, exact: true }).click();
-  const received = await response;
-  expect(received.status()).toBe(200);
+  const received = await realSourceResponse(page, await response);
   const data = await received.json();
   expect(["live", "cached"]).toContain(data.data_mode);
   expect(
@@ -107,7 +130,7 @@ test("audit: editing a pending search cancels it and never offers stale identiti
     r.url().includes("/api/movies?"),
   );
   await title.press("Enter");
-  expect((await response).status()).toBe(200);
+  await realSourceResponse(page, await response);
   await expect(page.locator(".lookup-results")).toContainText("没有找到影片");
 });
 
@@ -154,7 +177,7 @@ test("audit: Enter respects invalid search year and empty search uses honest gui
     r.url().includes("/api/movies?"),
   );
   await title.press("Enter");
-  expect((await response).status()).toBe(200);
+  await realSourceResponse(page, await response);
   await expect(page.locator(".lookup-results")).toContainText("没有找到影片");
   await expect(page.locator(".lookup-results")).not.toContainText(
     /春日来信|远星航线/,
@@ -342,8 +365,7 @@ for (const scene of scenes)
         r.request().method() === "POST",
     );
     await page.getByRole("button", { name: scene.name }).click();
-    const actual = await response;
-    expect(actual.status()).toBe(200);
+    const actual = await realSourceResponse(page, await response);
     expect(actual.request().postDataJSON().constraints).toMatchObject({
       moods: [scene.mood],
       genres: [scene.genre],
