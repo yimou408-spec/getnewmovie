@@ -1,5 +1,54 @@
 {
   "$defs": {
+    "ClarificationAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "question_id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Question Id",
+          "type": "string"
+        },
+        "option": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Option",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question_id",
+        "option"
+      ],
+      "title": "ClarificationAnswer",
+      "type": "object"
+    },
+    "ClarificationSubmission": {
+      "additionalProperties": false,
+      "properties": {
+        "clarification_id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Clarification Id",
+          "type": "string"
+        },
+        "answers": {
+          "items": {
+            "$ref": "#/$defs/ClarificationAnswer"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Answers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "clarification_id",
+        "answers"
+      ],
+      "title": "ClarificationSubmission",
+      "type": "object"
+    },
     "Constraints": {
       "additionalProperties": false,
       "properties": {
@@ -177,6 +226,26 @@
     },
     "constraints": {
       "$ref": "#/$defs/Constraints"
+    },
+    "input_source": {
+      "default": "structured",
+      "enum": [
+        "structured",
+        "natural_language"
+      ],
+      "title": "Input Source",
+      "type": "string"
+    },
+    "clarification": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClarificationSubmission"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

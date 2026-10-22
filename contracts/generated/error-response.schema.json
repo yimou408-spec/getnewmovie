@@ -27,7 +27,10 @@
         "UPSTREAM_RATE_LIMIT",
         "NOT_CONFIGURED",
         "NOT_FOUND",
-        "INVALID_SCENARIO"
+        "INVALID_SCENARIO",
+        "SESSION_EXPIRED",
+        "STALE_CLARIFICATION",
+        "INVALID_CLARIFICATION"
       ],
       "title": "Code",
       "type": "string"

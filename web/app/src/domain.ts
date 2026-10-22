@@ -106,6 +106,7 @@ export function buildRequest(
     throw new Error("时长请输入 1–600 分钟的整数。");
   const request: Request = {
     mode,
+    input_source: "structured",
     query:
       query.trim() ||
       (mode === "known_movie"
@@ -192,6 +193,17 @@ export async function api<T>(
       const body =
         raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
       const code = typeof body.code === "string" ? body.code : undefined;
+      if (code === "SESSION_EXPIRED" || code === "STALE_CLARIFICATION")
+        throw new ApiError(
+          code === "SESSION_EXPIRED"
+            ? "临时会话已过期，请重新提交观影想法。"
+            : "条件已变更，请重新提交，旧澄清答案不会继续使用。",
+          typeof body.trace_id === "string" ? body.trace_id : undefined,
+          false,
+          "session",
+          res.status,
+          code,
+        );
       const [kind, message, retryable] =
         res.status === 422
           ? (["validation", "输入未通过服务校验，请检查内容。", false] as const)

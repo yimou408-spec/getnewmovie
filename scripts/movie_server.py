@@ -7,23 +7,29 @@ from fastapi.responses import JSONResponse
 
 from scripts.movie_catalog import AppleCatalog, CatalogError, MOODS
 from scripts.movie_ranking import MOOD_CLUES, rank_movies
+from scripts.movie_intent import IntentSessions, explain
 from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
-                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities)
+                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities, SessionResponse)
 
 
 def create_app(catalog=None):
     catalog = catalog or AppleCatalog()
+    sessions = IntentSessions()
     app = FastAPI(title="Tonight movie catalog", version="0.1.0", description="Apple US real charts. Rule-based matching, no synthetic fallback.")
 
     @app.exception_handler(CatalogError)
     async def source_error(request: Request, exc: CatalogError):
         return JSONResponse(status_code=exc.status, content=ErrorResponse(trace_id=uuid4().hex, data_mode="live",
-            code=exc.code, message=exc.message, retryable=exc.status != 404).model_dump(mode="json"))
+            code=exc.code, message=exc.message, retryable=exc.status >= 500).model_dump(mode="json"))
+
+    @app.post("/sessions", response_model=SessionResponse)
+    def create_session():
+        return SessionResponse(session_id=sessions.create(), expires_in_seconds=sessions.ttl)
 
     @app.get("/health", response_model=HealthResponse)
     def health():
         return HealthResponse(service="real-catalog", provider="Apple iTunes US", synthetic_fallback=False,
-                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True))
+                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, natural_language=True))
 
     def find(mid):
         if not mid.startswith("itunes:"):
@@ -35,9 +41,15 @@ def create_app(catalog=None):
 
     @app.post("/recommendations", response_model=RecommendationResponse, responses={503: {"model": ErrorResponse}, 504: {"model": ErrorResponse}})
     def recommendations(body: RecommendationRequest):
+        interpretation, clarification_id, questions = (sessions.resolve(body) if body.input_source == "natural_language"
+                                                       else (explain(body.constraints), None, []))
+        if questions:
+            return RecommendationResponse(trace_id=uuid4().hex, data_mode="live", status="needs_clarification",
+                candidates=[], evidence=[], questions=questions, warnings=["尚未查询片库。请确认冲突或无法执行的要求，也可以修改输入重新提交。"],
+                memory_used=False, interpretation=interpretation, clarification_id=clarification_id)
         with catalog.lock:
             before = catalog.fetch_count
-            c = body.constraints
+            c = interpretation.effective_constraints
             mood_genres = set().union(*(MOODS[m] for m in c.moods)) if c.moods else set()
             pool_genres = c.genres or sorted(mood_genres) or (["家庭"] if c.company == "和家人" else [])
             if body.mode == "known_movie":
@@ -53,7 +65,7 @@ def create_app(catalog=None):
                     continue
                 if c.genres and not genres.intersection(c.genres):
                     continue
-                if mood_genres and not genres.intersection(mood_genres):
+                if body.input_source != "natural_language" and mood_genres and not genres.intersection(mood_genres):
                     continue
                 if c.company == "和家人" and not genres.intersection({"家庭", "动画"}):
                     continue
@@ -95,16 +107,20 @@ def create_app(catalog=None):
                     caveats=caveats,
                     availability=[Availability(region=body.region, status="unknown")]))
             warnings = ["范围：Apple 美国区当前分类榜单；片名沿用来源原文。评分及所选地区播放渠道未接入。",
-                        "类型与心情类别先交叉筛选；片长、年代、排除影片是硬条件，未知字段不进入对应限定结果。",
+                        ("类型、片长、年代和排除是硬条件；心情只辅助召回与排序，未知字段不进入对应限定结果。" if body.input_source == "natural_language" else "类型与心情类别先交叉筛选；片长、年代、排除影片是硬条件，未知字段不进入对应限定结果。"),
                         "排序：来源顺序，不代表口碑或适合程度。" if c.sort_by == "popular" else "排序：均衡探索。简介关键词辅助心情匹配，并分散类型和导演；无偏好时降低恐怖类别优先级。这不是评分或个人喜爱概率。"]
             if c.company:
                 warnings.append("和家人会限定家庭/动画类别，仍需自行核对适龄；其他同行选项仅记录本次情境，不影响排序。")
-            if body.query and ("补充：" in body.query or body.mode != "discover"):
+            if body.input_source == "natural_language":
+                warnings.append("文字由规则解析器处理，支持常见类型、心情、时长、年代与排除；不代表通用模型理解。心情为软偏好，不能保证内容感受。")
+                if interpretation.unhandled:
+                    warnings.append("经你确认未采用：" + "；".join(interpretation.unhandled))
+            elif body.query and ("补充：" in body.query or body.mode != "discover"):
                 warnings.append("补充文字暂不参与匹配；当前使用点选条件和已确认影片。")
             if not eligible:
                 warnings.insert(0, f"当前查得的 {len(films)} 部影片没有符合全部条件的结果。请放宽时长、减少心情或类型条件；不会用样例补齐。")
             return RecommendationResponse(trace_id=uuid4().hex, data_mode="cached" if before == catalog.fetch_count else "live", status="ready" if candidates else "empty",
-                candidates=candidates, evidence=evidence, questions=[], warnings=warnings, memory_used=False, catalog_size=len(films), matched_count=len(eligible))
+                candidates=candidates, evidence=evidence, questions=[], warnings=warnings, memory_used=False, catalog_size=len(films), matched_count=len(eligible), interpretation=interpretation)
 
     @app.get("/movies", response_model=MovieSearchResponse)
     def movies(query: str = Query(min_length=1, max_length=100), year: int | None = None):

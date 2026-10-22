@@ -118,6 +118,119 @@
       "title": "Candidate",
       "type": "object"
     },
+    "Constraints": {
+      "additionalProperties": false,
+      "properties": {
+        "max_runtime_minutes": {
+          "anyOf": [
+            {
+              "maximum": 600,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Runtime Minutes"
+        },
+        "exclude_movie_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 500,
+          "title": "Exclude Movie Ids",
+          "type": "array"
+        },
+        "exclude_genres": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Exclude Genres",
+          "type": "array"
+        },
+        "preferred_tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Preferred Tags",
+          "type": "array"
+        },
+        "moods": {
+          "items": {
+            "enum": [
+              "轻松解压",
+              "温暖治愈",
+              "烧脑过瘾",
+              "浪漫心动",
+              "惊奇冒险",
+              "感动一下"
+            ],
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Moods",
+          "type": "array"
+        },
+        "genres": {
+          "items": {
+            "enum": [
+              "喜剧",
+              "科幻与奇幻",
+              "惊悚",
+              "动作",
+              "爱情",
+              "动画",
+              "剧情",
+              "家庭",
+              "纪录片",
+              "恐怖"
+            ],
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Genres",
+          "type": "array"
+        },
+        "company": {
+          "default": "",
+          "enum": [
+            "",
+            "一个人",
+            "两个人",
+            "和朋友",
+            "和家人"
+          ],
+          "title": "Company",
+          "type": "string"
+        },
+        "sort_by": {
+          "default": "balanced",
+          "enum": [
+            "balanced",
+            "popular"
+          ],
+          "title": "Sort By",
+          "type": "string"
+        },
+        "era": {
+          "default": "any",
+          "enum": [
+            "any",
+            "recent",
+            "2000s",
+            "classic"
+          ],
+          "title": "Era",
+          "type": "string"
+        }
+      },
+      "title": "Constraints",
+      "type": "object"
+    },
     "Evidence": {
       "additionalProperties": false,
       "properties": {
@@ -182,6 +295,53 @@
         "spoiler_level"
       ],
       "title": "Evidence",
+      "type": "object"
+    },
+    "Interpretation": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "const": "rules-v1",
+          "default": "rules-v1",
+          "title": "Method",
+          "type": "string"
+        },
+        "effective_constraints": {
+          "$ref": "#/$defs/Constraints"
+        },
+        "hard_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Hard Conditions",
+          "type": "array"
+        },
+        "soft_preferences": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Soft Preferences",
+          "type": "array"
+        },
+        "conflicts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "unhandled": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unhandled",
+          "type": "array"
+        }
+      },
+      "required": [
+        "effective_constraints"
+      ],
+      "title": "Interpretation",
       "type": "object"
     },
     "Movie": {
@@ -512,6 +672,29 @@
       ],
       "default": null,
       "title": "Matched Count"
+    },
+    "interpretation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Interpretation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "clarification_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clarification Id"
     }
   },
   "required": [

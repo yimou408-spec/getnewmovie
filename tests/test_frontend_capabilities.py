@@ -23,7 +23,7 @@ def test_health_declares_metadata_separately_from_reputation_without_network():
         "metadata": True,
         "ratings": False,
         "reviews": False,
-        "natural_language": False,
+        "natural_language": True,
         "long_term_memory": False,
         "local_availability": False,
     }

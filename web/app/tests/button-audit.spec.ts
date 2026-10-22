@@ -300,7 +300,7 @@ test("audit: exclusion recovery and optional known-film/watchlist text", async (
     .click();
   await page.getByRole("tab", { name: "从片单中选", exact: true }).click();
   await page
-    .getByRole("textbox", { name: "补充备注（暂不参与匹配）", exact: true })
+    .getByRole("textbox", { name: "说说今晚想看什么（可选）", exact: true })
     .fill("");
   expect(
     (await recommend(page, "看看候选电影")).data.candidates[0].movie.movie_id,

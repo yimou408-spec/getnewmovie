@@ -60,8 +60,8 @@ import { ServiceStatus } from "./service-status";
 
 const initialDrafts: Record<Mode, string> = {
   discover: "",
-  watchlist: "从本次片单中，选一部适合今晚的电影",
-  known_movie: "想了解这部电影是否适合今晚观看",
+  watchlist: "",
+  known_movie: "",
 };
 const emptyPreferences: DiscoverPreferences = {
   moods: [],
@@ -366,9 +366,15 @@ export default function App() {
   const [snapshotQuery, setSnapshotQuery] = useState("");
   const [cancelled, setCancelled] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
+  const sessionId = useRef<string | undefined>(undefined);
+  const inFlight = useRef(false);
+  const lastAttempt = useRef<ReturnType<typeof buildRequest> | undefined>(
+    undefined,
+  );
   const [formError, setFormError] = useState<Error>();
   const [message, setMessage] = useState("");
-  const [clarificationCount, setClarificationCount] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [clarificationStale, setClarificationStale] = useState(false);
   const [hidden, setHidden] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<"balanced" | "popular">("balanced");
@@ -388,7 +394,12 @@ export default function App() {
     if (pathKey !== location.pathname) {
       activeRequest.current?.abort();
       activeRequest.current = null;
+      inFlight.current = false;
       recommend.reset();
+      if (result?.status === "needs_clarification") {
+        setClarificationStale(true);
+        setAnswers({});
+      }
       setPathKey(location.pathname);
       setMessage("");
       setUndo(undefined);
@@ -400,10 +411,35 @@ export default function App() {
     document.title = `${location.pathname === "/compare" ? "影片对比" : location.pathname === "/watchlist" ? "本次片单" : location.pathname === "/preferences" ? "偏好与隐私" : location.pathname === "/about" ? "关于与接入状态" : location.pathname.startsWith("/film/") ? "影片资料" : "今晚看什么"} · 私人选片室`;
   }, [location.pathname]);
   const recommend = useMutation({
-    mutationFn: async (body: ReturnType<typeof buildRequest>) => {
-      activeRequest.current?.abort();
-      const controller = new AbortController();
-      activeRequest.current = controller;
+    mutationFn: async ({
+      body,
+      controller,
+    }: {
+      body: ReturnType<typeof buildRequest>;
+      controller: AbortController;
+    }) => {
+      if (body.input_source === "natural_language") {
+        if (!sessionId.current) {
+          const session = await api<{ session_id: string }>("/sessions", {
+            method: "POST",
+            signal: controller.signal,
+          });
+          if (!/^[a-f0-9]{32}$/.test(session.session_id))
+            throw new ApiError(
+              "无法建立临时会话，请重试。",
+              undefined,
+              true,
+              "invalid_response",
+            );
+          if (
+            activeRequest.current === controller &&
+            !controller.signal.aborted
+          )
+            sessionId.current = session.session_id;
+        }
+        body = { ...body, session_id: sessionId.current ?? "" };
+      }
+      if (activeRequest.current === controller) lastAttempt.current = body;
       const data = validateResponse(
         await api("/recommendations", {
           method: "POST",
@@ -411,9 +447,9 @@ export default function App() {
           signal: controller.signal,
         }),
       );
-      return { data, controller };
+      return { data, controller, body };
     },
-    onSuccess: ({ data, controller }, body) => {
+    onSuccess: ({ data, controller, body }) => {
       if (activeRequest.current !== controller || controller.signal.aborted)
         return;
       setCancelled(false);
@@ -421,6 +457,7 @@ export default function App() {
       setResultRequest(body);
       setSnapshotQuery(body.query);
       setHidden([]);
+      if (data.status === "needs_clarification") setAnswers({});
       requestAnimationFrame(() => {
         resultsRef.current?.focus();
         resultsRef.current?.scrollIntoView({
@@ -429,22 +466,71 @@ export default function App() {
         });
       });
     },
+    onError: (error, { controller }) => {
+      if (activeRequest.current !== controller) return;
+      if (error instanceof ApiError && error.code === "SESSION_EXPIRED") {
+        sessionId.current = undefined;
+        setClarificationStale(true);
+      }
+      if (error instanceof ApiError && error.code === "STALE_CLARIFICATION")
+        setClarificationStale(true);
+    },
+    onSettled: (_data, _error, { controller }) => {
+      if (activeRequest.current === controller) inFlight.current = false;
+    },
   });
   useEffect(() => () => activeRequest.current?.abort(), []);
   function startRecommendation(body: ReturnType<typeof buildRequest>) {
+    if (inFlight.current) return;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    inFlight.current = true;
+    lastAttempt.current = body;
     setCancelled(false);
     setMessage("");
-    recommend.mutate(body);
+    recommend.mutate({ body, controller });
   }
   function cancelRecommendation() {
     activeRequest.current?.abort();
     activeRequest.current = null;
+    inFlight.current = false;
     recommend.reset();
     setCancelled(true);
     setMessage(
       "已取消本次请求，上一批结果仍保留。取消只停止本页面等待，不保证上游任务已停止。",
     );
     discoverRef.current?.focus();
+  }
+  function invalidateClarification() {
+    if (result?.status !== "needs_clarification" && !inFlight.current) return;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    inFlight.current = false;
+    recommend.reset();
+    setAnswers({});
+    setClarificationStale(true);
+  }
+  function confirmClarification() {
+    if (
+      clarificationStale ||
+      !resultRequest ||
+      !result?.clarification_id ||
+      !result.questions.every((q) =>
+        q.options?.includes(answers[q.question_id]),
+      )
+    )
+      return;
+    startRecommendation({
+      ...resultRequest,
+      clarification: {
+        clarification_id: result.clarification_id,
+        answers: result.questions.map((q) => ({
+          question_id: q.question_id,
+          option: answers[q.question_id],
+        })),
+      },
+    });
   }
   function submit(
     event?: FormEvent,
@@ -455,8 +541,10 @@ export default function App() {
     },
   ) {
     event?.preventDefault();
-    if (recommend.isPending) return;
+    if (inFlight.current) return;
     setFormError(undefined);
+    setAnswers({});
+    setClarificationStale(false);
     const requestMode = discovery ? "discover" : mode;
     const chosen = discovery?.preferences ?? preferences;
     if (discovery) {
@@ -468,22 +556,21 @@ export default function App() {
       setDrafts((current) => ({ ...current, discover: discovery.note ?? "" }));
     }
     try {
+      const note = discovery ? (discovery.note ?? "") : drafts[requestMode];
       const body = buildRequest(
         requestMode,
         requestMode === "discover"
-          ? discoverQuery(
-              chosen,
-              discovery ? (discovery.note ?? "") : drafts.discover,
-            )
-          : drafts[requestMode],
+          ? note.trim() || discoverQuery(chosen, "")
+          : note,
         region,
         discovery ? discovery.runtime : runtime,
         saved.map((m) => m.movie_id),
         selected,
-        clarificationCount,
+        0,
         requestMode === "discover" ? [...chosen.moods, ...chosen.genres] : [],
         requestMode === "discover" ? chosen : undefined,
       );
+      body.input_source = note.trim() ? "natural_language" : "structured";
       body.constraints = {
         company: "",
         ...body.constraints,
@@ -803,6 +890,7 @@ export default function App() {
                     <Tabs.Root
                       value={mode}
                       onValueChange={(v) => {
+                        invalidateClarification();
                         setMode(v as Mode);
                         setFormError(undefined);
                       }}
@@ -822,7 +910,51 @@ export default function App() {
                         </Tabs.Trigger>
                       </Tabs.List>
                       <Tabs.Content value={mode} className="mode-panel">
-                        <form onSubmit={submit}>
+                        <form
+                          onSubmit={submit}
+                          onChangeCapture={invalidateClarification}
+                          onClickCapture={(event) => {
+                            if (
+                              (event.target as HTMLElement).closest(
+                                'button:not([type="submit"])',
+                              )
+                            )
+                              invalidateClarification();
+                          }}
+                        >
+                          <div className="field natural-input">
+                            <label htmlFor="mood">
+                              {mode === "known_movie"
+                                ? "关于这部电影，你在意什么？"
+                                : "说说今晚想看什么（可选）"}
+                            </label>
+                            <textarea
+                              id="mood"
+                              name="query"
+                              autoComplete="off"
+                              ref={textareaRef}
+                              value={drafts[mode]}
+                              onChange={(e) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [mode]: e.target.value,
+                                }))
+                              }
+                              placeholder="例如：想看轻松的喜剧，两个小时以内，不要恐怖片。"
+                              maxLength={mode === "discover" ? 1500 : 2000}
+                              rows={2}
+                              aria-describedby="mood-help"
+                            />
+                            <div className="input-help" id="mood-help">
+                              <span>
+                                不填也能选。支持常见类型、心情、时长和排除；无法执行的要求会先请你确认。
+                              </span>
+                              <span>
+                                {drafts[mode].length}/
+                                {mode === "discover" ? 1500 : 2000}
+                              </span>
+                            </div>
+                          </div>
                           {mode === "discover" && (
                             <>
                               <div className="discovery-start">
@@ -1057,37 +1189,6 @@ export default function App() {
                             }}
                           >
                             <summary>补充文字、精确时长或地区（可选）</summary>
-                            <div className="field">
-                              <label htmlFor="mood">
-                                {mode === "known_movie"
-                                  ? "关于这部电影，你在意什么？"
-                                  : "补充备注（暂不参与匹配）"}
-                              </label>
-                              <textarea
-                                id="mood"
-                                name="query"
-                                autoComplete="off"
-                                ref={textareaRef}
-                                value={drafts[mode]}
-                                onChange={(e) =>
-                                  setDrafts((current) => ({
-                                    ...current,
-                                    [mode]: e.target.value,
-                                  }))
-                                }
-                                placeholder="比如：下班后想放松一下，轻松、有点幽默，100 分钟以内。"
-                                maxLength={mode === "discover" ? 1500 : 2000}
-                                rows={3}
-                                aria-describedby="mood-help"
-                              />
-                              <div className="input-help" id="mood-help">
-                                <span>还有在意的事再写，不填也能开始。</span>
-                                <span>
-                                  {drafts[mode].length}/
-                                  {mode === "discover" ? 1500 : 2000}
-                                </span>
-                              </div>
-                            </div>
                             <div className="constraints">
                               <div className="field">
                                 <label htmlFor="runtime">
@@ -1219,7 +1320,10 @@ export default function App() {
                       retry={
                         recommend.error instanceof ApiError &&
                         recommend.error.retryable
-                          ? () => submit()
+                          ? () => {
+                              if (lastAttempt.current)
+                                startRecommendation(lastAttempt.current);
+                            }
                           : undefined
                       }
                     />
@@ -1240,7 +1344,16 @@ export default function App() {
                   {result && (
                     <>
                       <div className="result-context">
-                        <Badge mode={result.data_mode} />
+                        {result.status === "needs_clarification" ? (
+                          <>
+                            {result.data_mode === "synthetic" && (
+                              <Badge mode="synthetic" />
+                            )}
+                            <span className="badge">待确认 · 尚未查询片库</span>
+                          </>
+                        ) : (
+                          <Badge mode={result.data_mode} />
+                        )}
                         <span>已提交偏好：{snapshotQuery}</span>
                         <small>
                           {result.memory_used
@@ -1248,11 +1361,58 @@ export default function App() {
                             : "未使用长期记忆"}
                         </small>
                       </div>
-                      <p className="match-summary">
-                        当前查得 {result.catalog_size ?? "未知"} 部 · 符合条件{" "}
-                        {result.matched_count ?? result.candidates.length} 部 ·
-                        本次展示 {result.candidates.length} 部
-                      </p>
+                      {result.status !== "needs_clarification" && (
+                        <p className="match-summary">
+                          当前查得 {result.catalog_size ?? "未知"} 部 · 符合条件{" "}
+                          {result.matched_count ?? result.candidates.length} 部
+                          · 本次展示 {result.candidates.length} 部
+                        </p>
+                      )}
+                      {result.interpretation && (
+                        <section
+                          className="intent-summary"
+                          aria-label="本次条件解释"
+                        >
+                          <h3>
+                            {result.status === "needs_clarification"
+                              ? "已识别条件（待确认）"
+                              : "已识别条件"}
+                          </h3>
+                          <p className="intent-method">
+                            规则解析 · 心情仅作软偏好
+                          </p>
+                          <ul>
+                            {(result.interpretation.hard_conditions ?? []).map(
+                              (item) => (
+                                <li key={item}>{item}</li>
+                              ),
+                            )}
+                            {(result.interpretation.soft_preferences ?? []).map(
+                              (item) => (
+                                <li key={item}>{item}</li>
+                              ),
+                            )}
+                          </ul>
+                          {!result.interpretation.hard_conditions?.length &&
+                            !result.interpretation.soft_preferences?.length && (
+                              <p>未指定可执行条件，按当前榜单探索。</p>
+                            )}
+                          {(result.interpretation.conflicts ?? []).map(
+                            (item) => (
+                              <p className="intent-warning" key={item}>
+                                待确认：{item}
+                              </p>
+                            ),
+                          )}
+                          {(result.interpretation.unhandled ?? []).map(
+                            (item) => (
+                              <p className="intent-warning" key={item}>
+                                未执行：{item}
+                              </p>
+                            ),
+                          )}
+                        </section>
+                      )}
                       {dismissed.length > 0 && (
                         <div className="selection-summary" role="status">
                           本次已排除 {dismissed.length} 部，后续选片继续生效。
@@ -1278,43 +1438,75 @@ export default function App() {
                         <div className="clarification">
                           <h3>再补充一点想法</h3>
                           {result.questions.map((q) => (
-                            <div key={q.question_id}>
-                              <p>{q.text}</p>
+                            <fieldset
+                              key={q.question_id}
+                              disabled={
+                                recommend.isPending || clarificationStale
+                              }
+                            >
+                              <legend>{q.text}</legend>
                               <div className="choice-row">
                                 {(q.options ?? []).map((option) => (
-                                  <Button
+                                  <label
+                                    className="clarification-option"
                                     key={option}
-                                    className="secondary"
-                                    disabled={clarificationCount >= 2}
-                                    onClick={() => {
-                                      setDrafts((current) => ({
-                                        ...current,
-                                        [mode]:
-                                          `${current[mode]}\n补充：${q.text}${option}`.slice(
-                                            0,
-                                            2000,
-                                          ),
-                                      }));
-                                      setClarificationCount((n) => n + 1);
-                                      setMessage(
-                                        "已补充到输入。补充文字暂不参与筛选，请使用上方点选条件。",
-                                      );
-                                      setDetailsOpen(true);
-                                      requestAnimationFrame(() =>
-                                        textareaRef.current?.focus(),
-                                      );
-                                    }}
                                   >
+                                    <input
+                                      type="radio"
+                                      name={`clarification-${q.question_id}`}
+                                      value={option}
+                                      checked={
+                                        answers[q.question_id] === option
+                                      }
+                                      onChange={() =>
+                                        setAnswers((current) => ({
+                                          ...current,
+                                          [q.question_id]: option,
+                                        }))
+                                      }
+                                    />
                                     {option}
-                                  </Button>
+                                  </label>
                                 ))}
                               </div>
-                            </div>
+                            </fieldset>
                           ))}
+                          {clarificationStale && (
+                            <p role="status">
+                              条件已变更或会话已过期。请在上方重新提交，旧答案不会继续使用。
+                            </p>
+                          )}
+                          <div className="choice-row">
+                            <Button
+                              className="primary"
+                              onClick={confirmClarification}
+                              disabled={
+                                clarificationStale ||
+                                recommend.isPending ||
+                                !result.clarification_id ||
+                                !result.questions.every((q) =>
+                                  q.options?.includes(answers[q.question_id]),
+                                )
+                              }
+                            >
+                              确认并继续推荐{" "}
+                              <ArrowRight size={17} aria-hidden="true" />
+                            </Button>
+                            <Button
+                              className="secondary"
+                              onClick={() => {
+                                invalidateClarification();
+                                textareaRef.current?.focus();
+                                textareaRef.current?.scrollIntoView({
+                                  block: "center",
+                                });
+                              }}
+                            >
+                              修改观影想法
+                            </Button>
+                          </div>
                           <small>
-                            {clarificationCount >= 2
-                              ? "已达到接口最多 2 次补充的限制。"
-                              : "选择会补充到输入；当前服务只演示澄清，不执行推理。"}
+                            请确认每个问题后继续；也可以修改文字重新提交。确认前不会查询或展示电影候选。
                           </small>
                         </div>
                       )}
@@ -2089,7 +2281,7 @@ function About() {
               [
                 "类型、心情与片长匹配",
                 "规则匹配已接入",
-                "类型、年代、片长为硬条件；心情结合类型和简介词法线索排序，支持均衡探索或榜单顺序。补充文字理解尚未实现。",
+                "文字通过规则解析常见类型、心情、时长、年代与排除；冲突或无法执行的条件需确认后才查询片库。类型、年代和片长为硬条件，文字心情仅辅助召回与排序。不具备通用模型理解能力。",
               ],
               [
                 "影片对比",
