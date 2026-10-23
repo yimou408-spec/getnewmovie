@@ -148,3 +148,58 @@ def test_conflict_copy_uses_readable_condition_names():
     c, _, sid = setup()
     result = c.post("/recommendations", json=request(sid, "剧情片", constraints={"genres": ["喜剧"]})).json()
     assert result["interpretation"]["conflicts"] == ["类型：点选 喜剧；文字 剧情"]
+
+
+def test_negated_watch_phrases_remain_hard_exclusions():
+    c, _, sid = setup()
+    for prefix in ["不要看", "不喜欢看", "不想看", "别看", "不看"]:
+        result = c.post("/recommendations", json=request(sid, f"{prefix}恐怖片，喜剧，90分钟以内")).json()
+        assert result["status"] == "ready", prefix
+        effective = result["interpretation"]["effective_constraints"]
+        assert effective["exclude_genres"] == ["恐怖"], prefix
+        assert effective["genres"] == ["喜剧"], prefix
+        assert [x["movie"]["movie_id"] for x in result["candidates"]] == ["itunes:101"]
+
+
+def test_negated_mood_or_era_never_becomes_positive_preference():
+    from scripts.movie_intent import parse_text
+    for query, field in [
+        ("不要看新片，喜剧", "era"),
+        ("不想看感动的喜剧", "moods"),
+        ("不喜欢看温暖治愈的喜剧", "moods"),
+        ("not romantic comedy", "moods"),
+    ]:
+        parsed, unsupported = parse_text(query)
+        assert not parsed.get(field), query
+        assert parsed["genres"] == ["喜剧"], query
+        assert unsupported, query
+
+
+def test_multiple_company_or_era_values_require_confirmation_before_catalog():
+    for query, field, label, default in [
+        ("一个人和朋友看喜剧", "company", "同行", ""),
+        ("新片和2000年以前的喜剧", "era", "年代", "any"),
+    ]:
+        c, catalog, sid = setup()
+        body = request(sid, query)
+        pending = c.post("/recommendations", json=body).json()
+        assert pending["status"] == "needs_clarification", query
+        assert not pending["candidates"] and catalog.calls == 0
+        assert pending["interpretation"]["effective_constraints"][field] == default
+        assert any(label in item for item in pending["interpretation"]["unhandled"])
+        resolved = answer(c, body, pending, ["仅按已识别条件继续"]).json()
+        assert resolved["status"] == "ready" and catalog.calls == 1
+        assert resolved["interpretation"]["effective_constraints"][field] == default
+        assert all(x["movie"]["genres"] == ["喜剧"] for x in resolved["candidates"])
+
+
+def test_repeated_synonyms_do_not_create_false_context_ambiguity():
+    from scripts.movie_intent import parse_text
+    for query, field, value in [
+        ("全家和家人看喜剧", "company", "和家人"),
+        ("新片和2020年至今的喜剧", "era", "recent"),
+    ]:
+        parsed, unsupported = parse_text(query)
+        assert parsed[field] == value, query
+        assert not unsupported, query
+
