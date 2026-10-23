@@ -124,3 +124,38 @@ def test_timeout_and_malformed_upstream_and_missing_runtime():
     for handler in [lambda r: httpx.Response(200, json={"unexpected": True}), lambda r: (_ for _ in ()).throw(httpx.ReadTimeout("test"))]:
         with TestClient(create_app(AppleCatalog(httpx.Client(transport=httpx.MockTransport(handler))))) as c:
             assert recommend(c).status_code in (503, 504)
+
+def test_artwork_is_catalog_owned_cached_and_bounded():
+    images = []
+    def handler(request):
+        if request.url.host.endswith(".mzstatic.com"):
+            images.append(str(request.url))
+            return httpx.Response(200, content=b"image-test-bytes", headers={"content-type": "image/jpeg"})
+        return transport(request)
+    provider = AppleCatalog(httpx.Client(transport=httpx.MockTransport(handler)), rate_limit=100)
+    with TestClient(create_app(provider)) as c:
+        recommend(c)
+        first = c.get("/artwork/itunes:101")
+        assert first.status_code == 200 and first.content == b"image-test-bytes"
+        assert first.headers["content-type"] == "image/jpeg"
+        assert first.headers["x-content-type-options"] == "nosniff"
+        assert c.get("/artwork/itunes:101").content == first.content
+        assert len(images) == 1 and images[0].endswith("/600x900bb.jpg")
+        assert c.get("/artwork/syn:demo").status_code == 404
+
+
+@pytest.mark.parametrize("status,media,content", [
+    (302, "image/jpeg", b"redirect"),
+    (200, "text/html", b"html"),
+    (200, "image/jpeg", b""),
+    (200, "image/jpeg", b"x" * (2 * 1024 * 1024 + 1)),
+])
+def test_artwork_rejects_redirects_invalid_types_empty_and_oversize(status, media, content):
+    def handler(request):
+        if request.url.host.endswith(".mzstatic.com"):
+            return httpx.Response(status, content=content, headers={"content-type": media})
+        return transport(request)
+    provider = AppleCatalog(httpx.Client(transport=httpx.MockTransport(handler)), rate_limit=100)
+    with TestClient(create_app(provider)) as c:
+        recommend(c)
+        assert c.get("/artwork/itunes:101").status_code == 503
