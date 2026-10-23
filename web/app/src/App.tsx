@@ -401,11 +401,12 @@ export default function App() {
     staleTime: 1800000,
     retry: false,
     refetchOnWindowFocus: false,
-    queryFn: async ({ signal }) =>
+    // Cache-owned reads survive subscriber remounts without duplicate requests.
+    // Explicit cancelQueries still discards their late result.
+    queryFn: async () =>
       validateResponse(
         await api("/recommendations", {
           method: "POST",
-          signal,
           body: JSON.stringify(
             buildRequest(
               "discover",
@@ -2147,8 +2148,7 @@ function FilmPage({
   const existing = candidates.find((c) => c.movie.movie_id === movieId);
   const query = useQuery({
     queryKey: ["film", movieId],
-    queryFn: ({ signal }) =>
-      api<Movie>(`/movies/${encodeURIComponent(movieId!)}`, { signal }),
+    queryFn: () => api<Movie>(`/movies/${encodeURIComponent(movieId!)}`),
     enabled: !existing,
     staleTime: 60000,
   });
@@ -2190,11 +2190,10 @@ function Compare({
   const ids = movies.map((m) => m.movie_id);
   const query = useQuery({
     queryKey: ["compare", ...ids],
-    queryFn: ({ signal }) =>
+    queryFn: () =>
       api<SearchResponse>("/comparisons", {
         method: "POST",
         body: JSON.stringify({ movie_ids: ids }),
-        signal,
       }),
     enabled: ids.length >= 2,
     staleTime: 60000,
