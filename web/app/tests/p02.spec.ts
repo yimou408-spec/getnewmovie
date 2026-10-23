@@ -393,3 +393,104 @@ test("P02 cancelling confirmation preserves selected answers and allows a real r
       .status,
   ).toBe("ready");
 });
+
+test("P02 negated watch phrases exclude a genre through the real UI", async ({
+  page,
+}, info) => {
+  for (const prefix of ["不要看", "不喜欢看", "不想看", "别看", "不看"]) {
+    await input(page).fill(`${prefix}恐怖片，喜剧，120分钟以内`);
+    const data = await submit(page);
+    expect(data.status).toBe("ready");
+    expect(data.interpretation.effective_constraints).toMatchObject({
+      genres: ["喜剧"],
+      exclude_genres: ["恐怖"],
+      max_runtime_minutes: 120,
+    });
+    expect(data.candidates.length).toBeGreaterThan(0);
+    for (const candidate of data.candidates) {
+      expect(candidate.movie.genres).toContain("喜剧");
+      expect(candidate.movie.genres).not.toContain("恐怖");
+      expect(candidate.movie.runtime_minutes).toBeLessThanOrEqual(120);
+    }
+    await expect(page.locator(".intent-summary")).toContainText("排除类型：恐怖");
+  }
+  await accessible(page);
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-p02-negated-genre.png`,
+    fullPage: true,
+  });
+});
+
+test("P02 negated era and mood require consent instead of becoming positive filters", async ({
+  page,
+}, info) => {
+  await input(page).fill("不要看新片，不想看感动的喜剧，120分钟以内");
+  const pending = await submit(page);
+  expect(pending.status).toBe("needs_clarification");
+  expect(pending.catalog_size).toBeNull();
+  expect(pending.evidence).toEqual([]);
+  expect(pending.interpretation.effective_constraints).toMatchObject({
+    genres: ["喜剧"],
+    era: "any",
+    moods: [],
+  });
+  await expect(cards(page)).toHaveCount(0);
+  await expect(confirm(page)).toBeDisabled();
+  await page
+    .getByRole("radio", { name: "仅按已识别条件继续", exact: true })
+    .check();
+  const done = await received(
+    page,
+    await response(page, () => confirm(page).click()),
+  );
+  expect(done.status).toBe("ready");
+  expect(done.interpretation.effective_constraints).toMatchObject({
+    era: "any",
+    moods: [],
+    genres: ["喜剧"],
+  });
+  await expect(page.locator(".results")).toContainText("经你确认未采用");
+  await accessible(page);
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-p02-negated-context.png`,
+    fullPage: true,
+  });
+});
+
+test("P02 ambiguous company and era cannot silently choose a different intent", async ({
+  page,
+}, info) => {
+  await input(page).fill("一个人和朋友看喜剧，新片和2000年以前，120分钟以内");
+  const pending = await submit(page);
+  expect(pending.status).toBe("needs_clarification");
+  expect(pending.catalog_size).toBeNull();
+  expect(pending.evidence).toEqual([]);
+  expect(pending.interpretation.effective_constraints).toMatchObject({
+    company: "",
+    era: "any",
+    genres: ["喜剧"],
+  });
+  expect(pending.interpretation.unhandled.join(" ")).toContain("多个不同同行");
+  expect(pending.interpretation.unhandled.join(" ")).toContain("多个不同年代");
+  await expect(cards(page)).toHaveCount(0);
+  await expect(confirm(page)).toBeDisabled();
+  await page
+    .getByRole("radio", { name: "仅按已识别条件继续", exact: true })
+    .check();
+  const done = await received(
+    page,
+    await response(page, () => confirm(page).click()),
+  );
+  expect(done.status).toBe("ready");
+  expect(done.interpretation.effective_constraints).toMatchObject({
+    company: "",
+    era: "any",
+    genres: ["喜剧"],
+  });
+  await expect(page.locator(".results")).toContainText("经你确认未采用");
+  await accessible(page);
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-p02-ambiguous-context.png`,
+    fullPage: true,
+  });
+});
