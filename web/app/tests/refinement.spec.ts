@@ -12,9 +12,7 @@ test("real refinement: remove one condition, submit it and return without losing
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const input = page.getByLabel("说说今晚想看什么（可选）", { exact: true });
   const mood = page.getByRole("group", { name: "想要什么感觉？" });
   const genre = page.getByRole("group", { name: "想看哪种故事？" });
@@ -180,9 +178,7 @@ test("film-first home loads real films before asking for input and rerolls", asy
       (c: any) => !ids.includes(c.movie.movie_id),
     ),
   ).toBe(true);
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "精细选片", exact: true }),
   ).toBeFocused();
