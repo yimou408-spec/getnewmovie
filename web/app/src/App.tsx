@@ -1432,7 +1432,10 @@ export default function App() {
                         ) : (
                           <Badge mode={result.data_mode} />
                         )}
-                        <span>已提交偏好：{snapshotQuery || "随意探索 · 未设筛选条件"}</span>
+                        <span>
+                          已提交偏好：
+                          {snapshotQuery || "随意探索 · 未设筛选条件"}
+                        </span>
                         <small>
                           {result.memory_used
                             ? "服务报告使用了记忆"
