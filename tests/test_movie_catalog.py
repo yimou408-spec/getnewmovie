@@ -144,13 +144,17 @@ def test_artwork_is_catalog_owned_cached_and_bounded():
         assert c.get("/artwork/syn:demo").status_code == 404
 
 
-@pytest.mark.parametrize("status,media,content", [
-    (302, "image/jpeg", b"redirect"),
-    (200, "text/html", b"html"),
-    (200, "image/jpeg", b""),
-    (200, "image/jpeg", b"x" * (2 * 1024 * 1024 + 1)),
+@pytest.mark.parametrize("case,status,media", [
+    ("redirect", 302, "image/jpeg"),
+    ("non-image", 200, "text/html"),
+    ("empty", 200, "image/jpeg"),
+    ("oversize", 200, "image/jpeg"),
 ])
-def test_artwork_rejects_redirects_invalid_types_empty_and_oversize(status, media, content):
+def test_artwork_rejects_redirects_invalid_types_empty_and_oversize(case, status, media):
+    # Keep large payloads out of pytest node IDs and failure parameter dumps.
+    content = b"x" * (2 * 1024 * 1024 + 1) if case == "oversize" else {
+        "redirect": b"redirect", "non-image": b"html", "empty": b"",
+    }[case]
     def handler(request):
         if request.url.host.endswith(".mzstatic.com"):
             return httpx.Response(status, content=content, headers={"content-type": media})
