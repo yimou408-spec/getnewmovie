@@ -482,7 +482,6 @@ export default function App() {
       if (activeRequest.current !== controller || controller.signal.aborted)
         return;
       setCancelled(false);
-      setFiltersOpen(false);
       setResult(data);
       setResultRequest(body);
       setSnapshotQuery(body.query);
@@ -531,7 +530,8 @@ export default function App() {
     setMessage(
       "已取消本次请求，上一批结果仍保留。取消只停止本页面等待，不保证上游任务已停止。",
     );
-    discoverRef.current?.focus();
+    if (filtersOpen) discoverRef.current?.focus();
+    else resultsRef.current?.focus();
   }
   function invalidateClarification() {
     if (result?.status !== "needs_clarification" && !inFlight.current) return;
@@ -915,6 +915,7 @@ export default function App() {
                 <DiscoveryHero
                   movies={result?.candidates.map((item) => item.movie) ?? []}
                   loading={opening.isFetching || recommend.isPending}
+                  synthetic={result?.data_mode === "synthetic"}
                   renderPoster={(movie) => <Poster movie={movie} />}
                   onExplore={() => {
                     resultsRef.current?.scrollIntoView({ block: "start" });
@@ -969,9 +970,7 @@ export default function App() {
                   <details
                     className="filter-workbench"
                     open={filtersOpen}
-                    onToggle={(event) =>
-                      setFiltersOpen(event.currentTarget.open)
-                    }
+                    onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
                   >
                     <summary>
                       <span>按自己的想法找</span>
@@ -1364,7 +1363,7 @@ export default function App() {
                   ref={resultsRef}
                   tabIndex={-1}
                   aria-labelledby="results-title"
-                  aria-busy={recommend.isPending}
+                  aria-busy={recommend.isPending || opening.isFetching}
                 >
                   <div className="section-heading">
                     <h2 id="results-title">
@@ -1380,7 +1379,9 @@ export default function App() {
                         : "不必填写，点一下就能开始"}
                     </span>
                   </div>
-                  {(formError || recommend.error || (!result && opening.error)) && (
+                  {(formError ||
+                    recommend.error ||
+                    (!result && opening.error)) && (
                     <ErrorNotice
                       error={formError ?? recommend.error ?? opening.error!}
                       retry={
@@ -1390,7 +1391,11 @@ export default function App() {
                               if (lastAttempt.current)
                                 startRecommendation(lastAttempt.current);
                             }
-                          : undefined
+                          : !result &&
+                              opening.error instanceof ApiError &&
+                              opening.error.retryable
+                            ? () => void opening.refetch()
+                            : undefined
                       }
                     />
                   )}
@@ -1605,7 +1610,15 @@ export default function App() {
                             className="secondary"
                             disabled={recommend.isPending}
                             onClick={() => {
-                              const previous = resultRequest;
+                              const previous =
+                                resultRequest ??
+                                buildRequest(
+                                  "discover",
+                                  discoverQuery(emptyPreferences, ""),
+                                  region,
+                                  "",
+                                  [],
+                                );
                               if (previous)
                                 startRecommendation({
                                   ...previous,
