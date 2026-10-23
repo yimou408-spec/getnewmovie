@@ -63,11 +63,23 @@ def test_genre_mood_and_strict_runtime_actually_filter():
         assert len(recommend(c, genres=["喜剧"], max_runtime_minutes=91).json()["candidates"]) == 1
 
 
+def test_structured_soft_mood_preserves_explicit_genre_and_hard_limits():
+    with client() as c:
+        result = recommend(c, genres=["剧情"], moods=["温暖治愈"], max_runtime_minutes=120).json()
+        assert result["status"] == "ready"
+        assert [x["movie"]["movie_id"] for x in result["candidates"]] == ["itunes:102"]
+        assert result["interpretation"]["soft_preferences"]
+        assert "心情只辅助召回与排序" in "".join(result["warnings"])
+        assert "类型接近" not in result["candidates"][0]["reason"]["text"]
+        for hard_limit in [{"max_runtime_minutes": 119}, {"exclude_movie_ids": ["itunes:102"]}, {"era": "classic"}]:
+            assert recommend(c, genres=["剧情"], moods=["温暖治愈"], **hard_limit).json()["status"] == "empty"
+
+
 def test_family_intersection_exclusions_and_empty_explanation():
     with client() as c:
         r = recommend(c, company="和家人").json()
         assert [x["movie"]["movie_id"] for x in r["candidates"]] == ["itunes:103"]
-        assert recommend(c, genres=["喜剧"], moods=["感动一下"]).json()["status"] == "empty"
+        assert recommend(c, genres=["喜剧"], company="和家人").json()["status"] == "empty"
         assert recommend(c, exclude_movie_ids=["itunes:101", "itunes:102", "itunes:103", "itunes:104"]).json()["warnings"]
 
 

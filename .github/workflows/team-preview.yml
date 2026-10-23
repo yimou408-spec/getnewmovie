@@ -1,0 +1,96 @@
+name: Team preview (45 minutes)
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/pionneerz-p01-20261021]
+    paths:
+      - .github/workflows/team-preview.yml
+      - scripts/movie_preview.py
+permissions:
+  contents: read
+concurrency:
+  group: team-preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-s0.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/app/package-lock.json
+      - name: Install and build
+        run: |
+          python -m pip install -r requirements-s0.txt
+          npm ci --prefix web/app
+          npm run build --prefix web/app
+          python -m compileall -q scripts/movie_preview.py
+      - name: Start isolated public movie preview
+        id: start
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p preview-evidence
+          python -m uvicorn scripts.movie_preview:app --host 127.0.0.1 --port 8000 > preview-evidence/server.log 2>&1 &
+          echo "PREVIEW_API_PID=$!" >> "$GITHUB_ENV"
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/health > preview-evidence/health.json; then break; fi
+            sleep 1
+          done
+          python -c 'import json; h=json.load(open("preview-evidence/health.json")); assert h["synthetic_fallback"] is False, h'
+          curl -fsS http://127.0.0.1:8000/ > preview-evidence/index.html
+          for route in about watchlist preferences film/itunes%3A863161983; do
+            curl -fsS "http://127.0.0.1:8000/$route" | cmp - preview-evidence/index.html
+          done
+          test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/not-a-route)" = 404
+          test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/assets/missing.js)" = 404
+          test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/README.md)" = 404
+          curl -fL --retry 3 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/movie-cloudflared
+          chmod +x /tmp/movie-cloudflared
+          sha256sum /tmp/movie-cloudflared > preview-evidence/cloudflared.sha256
+          /tmp/movie-cloudflared tunnel --no-autoupdate --protocol http2 --url http://127.0.0.1:8000 > preview-evidence/tunnel.log 2>&1 &
+          echo "PREVIEW_TUNNEL_PID=$!" >> "$GITHUB_ENV"
+          preview_url=""
+          for attempt in {1..60}; do
+            preview_url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' preview-evidence/tunnel.log | head -n 1 || true)
+            if [[ -n "$preview_url" ]]; then break; fi
+            sleep 1
+          done
+          test -n "$preview_url"
+          curl -fsS --retry 12 --retry-all-errors --retry-delay 2 "$preview_url/api/health" > preview-evidence/public-health.json
+          curl -fsS --retry 3 "$preview_url/" > preview-evidence/public-index.html
+          expires=$(date -u -d "+45 minutes" "+%Y-%m-%d %H:%M UTC")
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+          echo "expires=$expires" >> "$GITHUB_OUTPUT"
+          printf "## Team preview\n\n[Open frontend](%s)\n\nCommit: \`%s\`\n\nExpires around %s, or earlier if this job is cancelled.\n\nReal Apple US catalog; rule-based matching. No synthetic fallback. Ratings, Chinese streaming availability, persistent feedback and long-term memory are unavailable.\n\nThis is a temporary development preview, not a production deployment. Re-run this workflow to obtain a fresh URL. Only the built frontend and movie API are exposed.\n" "$preview_url" "$GITHUB_SHA" "$expires" >> "$GITHUB_STEP_SUMMARY"
+          echo "FRONTEND_PREVIEW=$preview_url; EXPIRES=$expires"
+      - name: Keep preview available for team review (45 minutes)
+        env:
+          PREVIEW_URL: ${{ steps.start.outputs.url }}
+        run: |
+          end=$((SECONDS + 2700))
+          while (( SECONDS < end )); do
+            kill -0 "$PREVIEW_API_PID"
+            kill -0 "$PREVIEW_TUNNEL_PID"
+            sleep 30
+          done
+      - name: Stop preview
+        if: always()
+        run: |
+          for pid in "${PREVIEW_API_PID:-}" "${PREVIEW_TUNNEL_PID:-}"; do
+            if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: team-preview-diagnostics
+          path: preview-evidence/
+          retention-days: 7

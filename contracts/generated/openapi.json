@@ -6,6 +6,24 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/sessions": {
+      "post": {
+        "summary": "Create Session",
+        "operationId": "create_session_sessions_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -15,7 +33,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
               }
             }
           }
@@ -342,6 +362,55 @@
         ],
         "title": "Candidate"
       },
+      "ClarificationAnswer": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Question Id"
+          },
+          "option": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Option"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question_id",
+          "option"
+        ],
+        "title": "ClarificationAnswer"
+      },
+      "ClarificationSubmission": {
+        "properties": {
+          "clarification_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Clarification Id"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ClarificationAnswer"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Answers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "clarification_id",
+          "answers"
+        ],
+        "title": "ClarificationSubmission"
+      },
       "ComparisonRequest": {
         "properties": {
           "movie_ids": {
@@ -502,7 +571,10 @@
               "UPSTREAM_RATE_LIMIT",
               "NOT_CONFIGURED",
               "NOT_FOUND",
-              "INVALID_SCENARIO"
+              "INVALID_SCENARIO",
+              "SESSION_EXPIRED",
+              "STALE_CLARIFICATION",
+              "INVALID_CLARIFICATION"
             ],
             "title": "Code"
           },
@@ -604,6 +676,93 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "synthetic_fallback": {
+            "type": "boolean",
+            "title": "Synthetic Fallback"
+          },
+          "cache_ttl_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cache Ttl Seconds"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceCapabilities"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service",
+          "provider",
+          "synthetic_fallback",
+          "cache_ttl_seconds"
+        ],
+        "title": "HealthResponse"
+      },
+      "Interpretation": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "const": "rules-v1",
+            "title": "Method",
+            "default": "rules-v1"
+          },
+          "effective_constraints": {
+            "$ref": "#/components/schemas/Constraints"
+          },
+          "hard_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hard Conditions"
+          },
+          "soft_preferences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Soft Preferences"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "unhandled": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unhandled"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "effective_constraints"
+        ],
+        "title": "Interpretation"
       },
       "Movie": {
         "properties": {
@@ -929,6 +1088,25 @@
           },
           "constraints": {
             "$ref": "#/components/schemas/Constraints"
+          },
+          "input_source": {
+            "type": "string",
+            "enum": [
+              "structured",
+              "natural_language"
+            ],
+            "title": "Input Source",
+            "default": "structured"
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClarificationSubmission"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1028,6 +1206,27 @@
               }
             ],
             "title": "Matched Count"
+          },
+          "interpretation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Interpretation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clarification_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification Id"
           }
         },
         "additionalProperties": false,
@@ -1043,6 +1242,63 @@
           "memory_used"
         ],
         "title": "RecommendationResponse"
+      },
+      "ServiceCapabilities": {
+        "properties": {
+          "metadata": {
+            "type": "boolean",
+            "title": "Metadata",
+            "default": false
+          },
+          "ratings": {
+            "type": "boolean",
+            "title": "Ratings",
+            "default": false
+          },
+          "reviews": {
+            "type": "boolean",
+            "title": "Reviews",
+            "default": false
+          },
+          "natural_language": {
+            "type": "boolean",
+            "title": "Natural Language",
+            "default": false
+          },
+          "long_term_memory": {
+            "type": "boolean",
+            "title": "Long Term Memory",
+            "default": false
+          },
+          "local_availability": {
+            "type": "boolean",
+            "title": "Local Availability",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ServiceCapabilities",
+        "description": "Implemented paths only, not a claim of upstream availability or quality."
+      },
+      "SessionResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "title": "Expires In Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "expires_in_seconds"
+        ],
+        "title": "SessionResponse"
       },
       "ValidationError": {
         "properties": {

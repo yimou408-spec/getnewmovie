@@ -32,7 +32,6 @@ import {
   ShieldCheck,
   Sparkles,
   X,
-  CircleAlert,
   ExternalLink,
   Monitor,
   Moon,
@@ -56,11 +55,19 @@ import {
   type Recommendation,
   type SearchResponse,
 } from "./domain";
+import { ErrorNotice } from "./request-feedback";
+import { ServiceStatus } from "./service-status";
+import { EvidencePanel, Ratings, SourceOpinions } from "./evidence";
+import {
+  reasonLabels,
+  snapshotForComparison,
+  type ComparedMovie,
+} from "./evidence-model";
 
 const initialDrafts: Record<Mode, string> = {
   discover: "",
-  watchlist: "从本次片单中，选一部适合今晚的电影",
-  known_movie: "想了解这部电影是否适合今晚观看",
+  watchlist: "",
+  known_movie: "",
 };
 const emptyPreferences: DiscoverPreferences = {
   moods: [],
@@ -219,24 +226,6 @@ function Empty({
     </div>
   );
 }
-function ErrorNotice({ error, retry }: { error: Error; retry?: () => void }) {
-  return (
-    <div role="alert" className="notice error">
-      <CircleAlert aria-hidden="true" />
-      <div>
-        <strong>{error.message}</strong>
-        {error instanceof ApiError && error.trace && (
-          <small>请求编号：{error.trace}</small>
-        )}
-        {retry && (
-          <Button className="quiet" onClick={retry}>
-            重新尝试
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
 function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
   const [status, setStatus] = useState<
     "loading" | "ready" | "error" | "timeout"
@@ -376,22 +365,33 @@ export default function App() {
   const [region, setRegion] = useState("CN");
   const [selected, setSelected] = useState<Movie>();
   const [saved, setSaved] = useState<Movie[]>([]);
-  const [comparison, setComparison] = useState<Movie[]>([]);
+  const [comparison, setComparison] = useState<ComparedMovie[]>([]);
   const [result, setResult] = useState<Recommendation>();
+  const [resultRequest, setResultRequest] =
+    useState<ReturnType<typeof buildRequest>>();
   const [snapshotQuery, setSnapshotQuery] = useState("");
+  const [cancelled, setCancelled] = useState(false);
+  const activeRequest = useRef<AbortController | null>(null);
+  const sessionId = useRef<string | undefined>(undefined);
+  const inFlight = useRef(false);
+  const lastAttempt = useRef<ReturnType<typeof buildRequest> | undefined>(
+    undefined,
+  );
   const [formError, setFormError] = useState<Error>();
   const [message, setMessage] = useState("");
-  const [clarificationCount, setClarificationCount] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [clarificationStale, setClarificationStale] = useState(false);
   const [hidden, setHidden] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<"balanced" | "popular">("balanced");
   const [era, setEra] = useState<"any" | "recent" | "2000s" | "classic">("any");
   const [undo, setUndo] = useState<{
     saved?: Movie[];
-    comparison?: Movie[];
+    comparison?: ComparedMovie[];
     selected?: Movie;
   }>();
   const resultsRef = useRef<HTMLElement>(null);
+  const composerRef = useRef<HTMLHeadingElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const discoverRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
@@ -399,6 +399,14 @@ export default function App() {
   const [pathKey, setPathKey] = useState(location.pathname);
   useEffect(() => {
     if (pathKey !== location.pathname) {
+      activeRequest.current?.abort();
+      activeRequest.current = null;
+      inFlight.current = false;
+      recommend.reset();
+      if (result?.status === "needs_clarification") {
+        setClarificationStale(true);
+        setAnswers({});
+      }
       setPathKey(location.pathname);
       setMessage("");
       setUndo(undefined);
@@ -410,17 +418,53 @@ export default function App() {
     document.title = `${location.pathname === "/compare" ? "影片对比" : location.pathname === "/watchlist" ? "本次片单" : location.pathname === "/preferences" ? "偏好与隐私" : location.pathname === "/about" ? "关于与接入状态" : location.pathname.startsWith("/film/") ? "影片资料" : "今晚看什么"} · 私人选片室`;
   }, [location.pathname]);
   const recommend = useMutation({
-    mutationFn: async (body: ReturnType<typeof buildRequest>) =>
-      validateResponse(
+    mutationFn: async ({
+      body,
+      controller,
+    }: {
+      body: ReturnType<typeof buildRequest>;
+      controller: AbortController;
+    }) => {
+      if (body.input_source === "natural_language") {
+        if (!sessionId.current) {
+          const session = await api<{ session_id: string }>("/sessions", {
+            method: "POST",
+            signal: controller.signal,
+          });
+          if (!/^[a-f0-9]{32}$/.test(session.session_id))
+            throw new ApiError(
+              "无法建立临时会话，请重试。",
+              undefined,
+              true,
+              "invalid_response",
+            );
+          if (
+            activeRequest.current === controller &&
+            !controller.signal.aborted
+          )
+            sessionId.current = session.session_id;
+        }
+        body = { ...body, session_id: sessionId.current ?? "" };
+      }
+      if (activeRequest.current === controller) lastAttempt.current = body;
+      const data = validateResponse(
         await api("/recommendations", {
           method: "POST",
           body: JSON.stringify(body),
+          signal: controller.signal,
         }),
-      ),
-    onSuccess: (data, body) => {
+      );
+      return { data, controller, body };
+    },
+    onSuccess: ({ data, controller, body }) => {
+      if (activeRequest.current !== controller || controller.signal.aborted)
+        return;
+      setCancelled(false);
       setResult(data);
+      setResultRequest(body);
       setSnapshotQuery(body.query);
       setHidden([]);
+      if (data.status === "needs_clarification") setAnswers({});
       requestAnimationFrame(() => {
         resultsRef.current?.focus();
         resultsRef.current?.scrollIntoView({
@@ -429,7 +473,72 @@ export default function App() {
         });
       });
     },
+    onError: (error, { controller }) => {
+      if (activeRequest.current !== controller) return;
+      if (error instanceof ApiError && error.code === "SESSION_EXPIRED") {
+        sessionId.current = undefined;
+        setClarificationStale(true);
+      }
+      if (error instanceof ApiError && error.code === "STALE_CLARIFICATION")
+        setClarificationStale(true);
+    },
+    onSettled: (_data, _error, { controller }) => {
+      if (activeRequest.current === controller) inFlight.current = false;
+    },
   });
+  useEffect(() => () => activeRequest.current?.abort(), []);
+  function startRecommendation(body: ReturnType<typeof buildRequest>) {
+    if (inFlight.current) return;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    inFlight.current = true;
+    lastAttempt.current = body;
+    setCancelled(false);
+    setMessage("");
+    recommend.mutate({ body, controller });
+  }
+  function cancelRecommendation() {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    inFlight.current = false;
+    recommend.reset();
+    setCancelled(true);
+    setMessage(
+      "已取消本次请求，上一批结果仍保留。取消只停止本页面等待，不保证上游任务已停止。",
+    );
+    discoverRef.current?.focus();
+  }
+  function invalidateClarification() {
+    if (result?.status !== "needs_clarification" && !inFlight.current) return;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    inFlight.current = false;
+    recommend.reset();
+    setAnswers({});
+    setClarificationStale(true);
+  }
+  function confirmClarification() {
+    if (
+      clarificationStale ||
+      !resultRequest ||
+      !result?.clarification_id ||
+      !result.questions.every((q) =>
+        q.options?.includes(answers[q.question_id]),
+      )
+    )
+      return;
+    startRecommendation({
+      ...resultRequest,
+      clarification: {
+        clarification_id: result.clarification_id,
+        answers: result.questions.map((q) => ({
+          question_id: q.question_id,
+          option: answers[q.question_id],
+        })),
+      },
+    });
+  }
   function submit(
     event?: FormEvent,
     discovery?: {
@@ -439,41 +548,44 @@ export default function App() {
     },
   ) {
     event?.preventDefault();
-    if (recommend.isPending) return;
+    if (inFlight.current) return;
     setFormError(undefined);
+    setAnswers({});
+    setClarificationStale(false);
     const requestMode = discovery ? "discover" : mode;
     const chosen = discovery?.preferences ?? preferences;
     if (discovery) {
       setMode("discover");
       setPreferences(chosen);
       setRuntime(discovery.runtime);
+      setEra("any");
+      setSortBy("balanced");
       setDrafts((current) => ({ ...current, discover: discovery.note ?? "" }));
     }
     try {
+      const note = discovery ? (discovery.note ?? "") : drafts[requestMode];
       const body = buildRequest(
         requestMode,
         requestMode === "discover"
-          ? discoverQuery(
-              chosen,
-              discovery ? (discovery.note ?? "") : drafts.discover,
-            )
-          : drafts[requestMode],
+          ? note.trim() || discoverQuery(chosen, "")
+          : note,
         region,
         discovery ? discovery.runtime : runtime,
         saved.map((m) => m.movie_id),
         selected,
-        clarificationCount,
+        0,
         requestMode === "discover" ? [...chosen.moods, ...chosen.genres] : [],
         requestMode === "discover" ? chosen : undefined,
       );
+      body.input_source = note.trim() ? "natural_language" : "structured";
       body.constraints = {
         company: "",
         ...body.constraints,
         exclude_movie_ids: dismissed,
-        sort_by: sortBy,
-        era,
+        sort_by: discovery ? "balanced" : sortBy,
+        era: discovery ? "any" : era,
       };
-      recommend.mutate(body);
+      startRecommendation(body);
     } catch (e) {
       setFormError(e as Error);
       resultsRef.current?.focus();
@@ -519,9 +631,61 @@ export default function App() {
         current.filter((m) => m.movie_id !== movie.movie_id),
       );
     else if (comparison.length < 3)
-      setComparison((current) => [...current, movie]);
+      setComparison((current) => [
+        ...current,
+        snapshotForComparison(movie, result),
+      ]);
     else setMessage("最多对比 3 部影片，请先移除一部。");
   }
+  function editConditions() {
+    composerRef.current?.focus({ preventScroll: true });
+    composerRef.current?.scrollIntoView({ block: "start" });
+  }
+  const selectedConditions = [
+    ...preferences.moods.map((label) => ({
+      label,
+      remove: () =>
+        setPreferences((current) => ({
+          ...current,
+          moods: current.moods.filter((value) => value !== label),
+        })),
+    })),
+    ...preferences.genres.map((label) => ({
+      label,
+      remove: () =>
+        setPreferences((current) => ({
+          ...current,
+          genres: current.genres.filter((value) => value !== label),
+        })),
+    })),
+    ...(preferences.company
+      ? [
+          {
+            label: preferences.company,
+            remove: () =>
+              setPreferences((current) => ({ ...current, company: "" })),
+          },
+        ]
+      : []),
+    ...(runtime
+      ? [{ label: `${runtime} 分钟内`, remove: () => setRuntime("") }]
+      : []),
+    ...(era !== "any"
+      ? [
+          {
+            label: {
+              recent: "2020 年至今",
+              "2000s": "2000—2019 年",
+              classic: "2000 年以前",
+            }[era],
+            remove: () => setEra("any"),
+          },
+        ]
+      : []),
+    ...(sortBy === "popular"
+      ? [{ label: "榜单顺序", remove: () => setSortBy("balanced") }]
+      : []),
+  ];
   const actions = (movie: Movie) => (
     <>
       <Button
@@ -550,17 +714,25 @@ export default function App() {
     </>
   );
   const knownCandidates = result?.candidates ?? [];
-  function card(movie: Movie, candidate?: Candidate) {
+  function card(movie: Movie, candidate?: Candidate, index = 0) {
     return (
       <article
         className={`movie-card ${candidate ? "recommendation-card" : ""}`}
         key={movie.movie_id}
       >
-        <Poster
-          key={movie.poster_url ?? movie.movie_id}
-          movie={movie}
-          small={!candidate}
-        />
+        <div className="movie-cover">
+          <Poster
+            key={movie.poster_url ?? movie.movie_id}
+            movie={movie}
+            small={!candidate}
+          />
+          {candidate && (
+            <span className="pick-number" aria-hidden="true">
+              {String(index + 1).padStart(2, "0")}
+              <span>今晚候选</span>
+            </span>
+          )}
+        </div>
         <div className="movie-body">
           <div className="movie-heading">
             <div>
@@ -598,13 +770,7 @@ export default function App() {
                 </span>
                 <p>{candidate.reason.text}</p>
                 <small>
-                  {
-                    {
-                      metadata_fact: "影片资料",
-                      source_opinion: "来源观点",
-                      matching_inference: "匹配推断",
-                    }[candidate.reason.kind]
-                  }
+                  {reasonLabels[candidate.reason.kind]} · 不等同于观众口碑
                 </small>
               </div>
               <div className="caveats">
@@ -618,7 +784,7 @@ export default function App() {
                   <p key={i}>待确认：{c}</p>
                 ))}
               </div>
-              <Ratings movie={movie} />
+              <Ratings movie={movie} evidence={result?.evidence} />
               <Availability candidate={candidate} />
             </>
           ) : (
@@ -630,25 +796,12 @@ export default function App() {
           <div className="movie-actions">{actions(movie)}</div>
           {candidate && (
             <>
-              <details className="sources">
-                <summary>核对理由与来源</summary>
-                {result!.evidence
-                  .filter((e) =>
-                    candidate.reason.evidence_ids.includes(e.evidence_id),
-                  )
-                  .map((e) => (
-                    <div className="source" key={e.evidence_id}>
-                      <strong>{e.source}</strong>
-                      <p>
-                        {e.spoiler_level === "safe"
-                          ? e.claim
-                          : "来源可能包含剧透，暂不展示内容。"}
-                      </p>
-                      <small>采集时间：{e.retrieved_at}</small>
-                      <SourceLink url={e.url}>查看来源</SourceLink>
-                    </div>
-                  ))}
-              </details>
+              <EvidencePanel
+                movie={movie}
+                candidate={candidate}
+                evidence={result?.evidence ?? []}
+                dataMode={result?.data_mode}
+              />
               <Button
                 className="text-button"
                 onClick={() => {
@@ -739,11 +892,7 @@ export default function App() {
                     <p className="intro-note">
                       私人选片室 · 给自己留一点电影时间
                     </p>
-                    <h1>
-                      今晚，
-                      <br />
-                      想看点什么？
-                    </h1>
+                    <h1>今晚，想看点什么？</h1>
                     <p className="intro-description">
                       暂停日常，走进另一个故事。
                       <br />
@@ -753,9 +902,7 @@ export default function App() {
                       className="hero-action"
                       onClick={() => {
                         setMode("discover");
-                        requestAnimationFrame(() =>
-                          discoverRef.current?.focus(),
-                        );
+                        requestAnimationFrame(editConditions);
                       }}
                     >
                       开始今晚的选片 <ArrowRight size={20} aria-hidden="true" />
@@ -774,17 +921,63 @@ export default function App() {
                   </div>
                 </section>
                 <div className="workspace">
+                  <aside className="inspiration">
+                    <div className="aside-heading">
+                      <Sparkles size={19} aria-hidden="true" />
+                      <h2>懒得选？点一个场景</h2>
+                    </div>
+                    <p>点一下，按这个场景找真实电影。</p>
+                    <div className="idea-list">
+                      {ideas.map((idea) => (
+                        <button
+                          key={idea.title}
+                          disabled={recommend.isPending}
+                          onClick={() =>
+                            submit(undefined, {
+                              preferences: {
+                                moods: idea.moods,
+                                genres: idea.genres,
+                                company: idea.company,
+                              },
+                              runtime: idea.runtime,
+                            })
+                          }
+                        >
+                          <span className="idea-icon" aria-hidden="true">
+                            <idea.icon size={23} />
+                          </span>
+                          <span>
+                            {idea.title}
+                            <small>{idea.subtitle}</small>
+                          </span>
+                          <ArrowRight size={17} aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="principle">
+                      <ShieldCheck size={20} />
+                      <p>
+                        <strong>让选择有据可依</strong>
+                        <span>
+                          区分资料、观点与推断。未知的评分与观看渠道，保持未知。
+                        </span>
+                      </p>
+                    </div>
+                  </aside>
                   <section
                     className="composer"
                     aria-labelledby="composer-title"
                   >
                     <div className="composer-heading">
-                      <h2 id="composer-title">没想法，也能开始</h2>
+                      <h2 id="composer-title" ref={composerRef} tabIndex={-1}>
+                        没想法，也能开始
+                      </h2>
                       <p>不用打字。随意点几项，或直接看看。</p>
                     </div>
                     <Tabs.Root
                       value={mode}
                       onValueChange={(v) => {
+                        invalidateClarification();
                         setMode(v as Mode);
                         setFormError(undefined);
                       }}
@@ -804,7 +997,18 @@ export default function App() {
                         </Tabs.Trigger>
                       </Tabs.List>
                       <Tabs.Content value={mode} className="mode-panel">
-                        <form onSubmit={submit}>
+                        <form
+                          onSubmit={submit}
+                          onChangeCapture={invalidateClarification}
+                          onClickCapture={(event) => {
+                            if (
+                              (event.target as HTMLElement).closest(
+                                'button:not([type="submit"])',
+                              )
+                            )
+                              invalidateClarification();
+                          }}
+                        >
                           {mode === "discover" && (
                             <>
                               <div className="discovery-start">
@@ -826,7 +1030,7 @@ export default function App() {
                                 <p>不用打字，先看 3 部真实电影</p>
                               </div>
                               <div className="preference-heading">
-                                <strong>或者，给今晚一点方向</strong>
+                                <strong>点几下，给今晚一点方向</strong>
                                 <button
                                   type="button"
                                   className="reset-preferences"
@@ -889,6 +1093,24 @@ export default function App() {
                                   }
                                 />
                                 <ChoiceGroup
+                                  label="今晚有多少时间？"
+                                  options={[
+                                    "90 分钟内",
+                                    "120 分钟内",
+                                    "150 分钟内",
+                                    ...(runtime &&
+                                    !["90", "120", "150"].includes(runtime)
+                                      ? [`${runtime} 分钟内`]
+                                      : []),
+                                  ]}
+                                  selected={
+                                    runtime ? [`${runtime} 分钟内`] : []
+                                  }
+                                  onChange={(values) =>
+                                    setRuntime(values[0]?.split(" ")[0] ?? "")
+                                  }
+                                />
+                                <ChoiceGroup
                                   label="和谁一起看？（家人会筛选家庭/动画）"
                                   anyLabel="都可以"
                                   options={[
@@ -907,24 +1129,6 @@ export default function App() {
                                       ...current,
                                       company: values[0] ?? "",
                                     }))
-                                  }
-                                />
-                                <ChoiceGroup
-                                  label="今晚有多少时间？"
-                                  options={[
-                                    "90 分钟内",
-                                    "120 分钟内",
-                                    "150 分钟内",
-                                    ...(runtime &&
-                                    !["90", "120", "150"].includes(runtime)
-                                      ? [`${runtime} 分钟内`]
-                                      : []),
-                                  ]}
-                                  selected={
-                                    runtime ? [`${runtime} 分钟内`] : []
-                                  }
-                                  onChange={(values) =>
-                                    setRuntime(values[0]?.split(" ")[0] ?? "")
                                   }
                                 />
                                 <ChoiceGroup
@@ -972,31 +1176,71 @@ export default function App() {
                                   }
                                 />
                               </div>
-                              <p className="selection-summary" role="status">
-                                {[
-                                  ...preferences.moods,
-                                  ...preferences.genres,
-                                  preferences.company,
-                                  runtime ? `${runtime} 分钟内` : "",
-                                  era !== "any"
-                                    ? {
-                                        recent: "2020 年至今",
-                                        "2000s": "2000—2019 年",
-                                        classic: "2000 年以前",
-                                      }[era]
-                                    : "",
-                                  sortBy === "popular" ? "榜单顺序" : "",
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ") ||
-                                  "还没选也没关系，直接看看就好。"}
-                              </p>
+                              <div
+                                className="selection-summary"
+                                aria-label="已选条件"
+                                role="status"
+                              >
+                                {selectedConditions.length ? (
+                                  <>
+                                    <span className="selection-caption">
+                                      已选 {selectedConditions.length} 项
+                                    </span>
+                                    {selectedConditions.map((condition) => (
+                                      <button
+                                        key={condition.label}
+                                        type="button"
+                                        onClick={condition.remove}
+                                        aria-label={`移除条件 ${condition.label}`}
+                                      >
+                                        {condition.label}
+                                        <X size={13} aria-hidden="true" />
+                                      </button>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span>不设条件也可以，直接看看就好。</span>
+                                )}
+                              </div>
                               <p className="mock-limit">
                                 <Info size={15} aria-hidden="true" />
                                 类型、年代和时长严格筛选。心情结合类型与简介词法线索推断；均衡探索会分散类型和导演，不代表口碑评分。
                               </p>
                             </>
                           )}
+                          <div className="field natural-input">
+                            <label htmlFor="mood">
+                              {mode === "known_movie"
+                                ? "关于这部电影，你在意什么？"
+                                : "说说今晚想看什么（可选）"}
+                            </label>
+                            <textarea
+                              id="mood"
+                              name="query"
+                              autoComplete="off"
+                              ref={textareaRef}
+                              value={drafts[mode]}
+                              onChange={(e) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [mode]: e.target.value,
+                                }))
+                              }
+                              placeholder="例如：想看轻松的喜剧，两个小时以内，不要恐怖片。"
+                              maxLength={mode === "discover" ? 1500 : 2000}
+                              rows={2}
+                              aria-describedby="mood-help"
+                            />
+                            <div className="input-help" id="mood-help">
+                              <span>
+                                不填也能选。支持常见类型、心情、时长和排除；无法执行的要求会先请你确认。
+                              </span>
+                              <span>
+                                {drafts[mode].length}/
+                                {mode === "discover" ? 1500 : 2000}
+                              </span>
+                            </div>
+                          </div>
                           {mode === "known_movie" && (
                             <>
                               <MovieLookup
@@ -1038,38 +1282,7 @@ export default function App() {
                                 setDetailsOpen(event.currentTarget.open);
                             }}
                           >
-                            <summary>补充文字、精确时长或地区（可选）</summary>
-                            <div className="field">
-                              <label htmlFor="mood">
-                                {mode === "known_movie"
-                                  ? "关于这部电影，你在意什么？"
-                                  : "补充备注（暂不参与匹配）"}
-                              </label>
-                              <textarea
-                                id="mood"
-                                name="query"
-                                autoComplete="off"
-                                ref={textareaRef}
-                                value={drafts[mode]}
-                                onChange={(e) =>
-                                  setDrafts((current) => ({
-                                    ...current,
-                                    [mode]: e.target.value,
-                                  }))
-                                }
-                                placeholder="比如：下班后想放松一下，轻松、有点幽默，100 分钟以内。"
-                                maxLength={mode === "discover" ? 1500 : 2000}
-                                rows={3}
-                                aria-describedby="mood-help"
-                              />
-                              <div className="input-help" id="mood-help">
-                                <span>还有在意的事再写，不填也能开始。</span>
-                                <span>
-                                  {drafts[mode].length}/
-                                  {mode === "discover" ? 1500 : 2000}
-                                </span>
-                              </div>
-                            </div>
+                            <summary>精确时长与观看地区（可选）</summary>
                             <div className="constraints">
                               <div className="field">
                                 <label htmlFor="runtime">
@@ -1130,49 +1343,6 @@ export default function App() {
                       </Tabs.Content>
                     </Tabs.Root>
                   </section>
-                  <aside className="inspiration">
-                    <div className="aside-heading">
-                      <Sparkles size={19} aria-hidden="true" />
-                      <h2>懒得选？点一个场景</h2>
-                    </div>
-                    <p>点一下，按这个场景找真实电影。</p>
-                    <div className="idea-list">
-                      {ideas.map((idea) => (
-                        <button
-                          key={idea.title}
-                          disabled={recommend.isPending}
-                          onClick={() =>
-                            submit(undefined, {
-                              preferences: {
-                                moods: idea.moods,
-                                genres: idea.genres,
-                                company: idea.company,
-                              },
-                              runtime: idea.runtime,
-                            })
-                          }
-                        >
-                          <span className="idea-icon" aria-hidden="true">
-                            <idea.icon size={23} />
-                          </span>
-                          <span>
-                            {idea.title}
-                            <small>{idea.subtitle}</small>
-                          </span>
-                          <ArrowRight size={17} aria-hidden="true" />
-                        </button>
-                      ))}
-                    </div>
-                    <div className="principle">
-                      <ShieldCheck size={20} />
-                      <p>
-                        <strong>让选择有据可依</strong>
-                        <span>
-                          区分资料、观点与推断。未知的评分与观看渠道，保持未知。
-                        </span>
-                      </p>
-                    </div>
-                  </aside>
                 </div>
                 <section
                   className="results"
@@ -1184,7 +1354,7 @@ export default function App() {
                   <div className="section-heading">
                     <h2 id="results-title">
                       {result
-                        ? recommend.isError || recommend.isPending
+                        ? recommend.isError || recommend.isPending || cancelled
                           ? "上次候选结果"
                           : "你的候选电影"
                         : "把今晚留给合适的一部"}
@@ -1201,7 +1371,10 @@ export default function App() {
                       retry={
                         recommend.error instanceof ApiError &&
                         recommend.error.retryable
-                          ? () => submit()
+                          ? () => {
+                              if (lastAttempt.current)
+                                startRecommendation(lastAttempt.current);
+                            }
                           : undefined
                       }
                     />
@@ -1211,12 +1384,27 @@ export default function App() {
                       <div className="skeleton" />
                       <p>正在从真实片库匹配电影…</p>
                       <small>不会自动重复请求。</small>
+                      <Button
+                        className="secondary"
+                        onClick={cancelRecommendation}
+                      >
+                        取消本次请求
+                      </Button>
                     </div>
                   )}
                   {result && (
                     <>
                       <div className="result-context">
-                        <Badge mode={result.data_mode} />
+                        {result.status === "needs_clarification" ? (
+                          <>
+                            {result.data_mode === "synthetic" && (
+                              <Badge mode="synthetic" />
+                            )}
+                            <span className="badge">待确认 · 尚未查询片库</span>
+                          </>
+                        ) : (
+                          <Badge mode={result.data_mode} />
+                        )}
                         <span>已提交偏好：{snapshotQuery}</span>
                         <small>
                           {result.memory_used
@@ -1224,11 +1412,58 @@ export default function App() {
                             : "未使用长期记忆"}
                         </small>
                       </div>
-                      <p className="match-summary">
-                        当前查得 {result.catalog_size ?? "未知"} 部 · 符合条件{" "}
-                        {result.matched_count ?? result.candidates.length} 部 ·
-                        本次展示 {result.candidates.length} 部
-                      </p>
+                      {result.status !== "needs_clarification" && (
+                        <p className="match-summary">
+                          当前查得 {result.catalog_size ?? "未知"} 部 · 符合条件{" "}
+                          {result.matched_count ?? result.candidates.length} 部
+                          · 本次展示 {result.candidates.length} 部
+                        </p>
+                      )}
+                      {result.interpretation && (
+                        <section
+                          className="intent-summary"
+                          aria-label="本次条件解释"
+                        >
+                          <h3>
+                            {result.status === "needs_clarification"
+                              ? "已识别条件（待确认）"
+                              : "已识别条件"}
+                          </h3>
+                          <p className="intent-method">
+                            规则解析 · 心情仅作软偏好
+                          </p>
+                          <ul>
+                            {(result.interpretation.hard_conditions ?? []).map(
+                              (item) => (
+                                <li key={item}>{item}</li>
+                              ),
+                            )}
+                            {(result.interpretation.soft_preferences ?? []).map(
+                              (item) => (
+                                <li key={item}>{item}</li>
+                              ),
+                            )}
+                          </ul>
+                          {!result.interpretation.hard_conditions?.length &&
+                            !result.interpretation.soft_preferences?.length && (
+                              <p>未指定可执行条件，按当前榜单探索。</p>
+                            )}
+                          {(result.interpretation.conflicts ?? []).map(
+                            (item) => (
+                              <p className="intent-warning" key={item}>
+                                待确认：{item}
+                              </p>
+                            ),
+                          )}
+                          {(result.interpretation.unhandled ?? []).map(
+                            (item) => (
+                              <p className="intent-warning" key={item}>
+                                未执行：{item}
+                              </p>
+                            ),
+                          )}
+                        </section>
+                      )}
                       {dismissed.length > 0 && (
                         <div className="selection-summary" role="status">
                           本次已排除 {dismissed.length} 部，后续选片继续生效。
@@ -1244,91 +1479,148 @@ export default function App() {
                           </Button>
                         </div>
                       )}
-                      {result.warnings.map((warning, i) => (
-                        <div className="notice" key={i}>
-                          <Info size={18} />
-                          <span>{warning}</span>
+                      {result.warnings.length > 0 && (
+                        <div className="result-limits">
+                          <p>
+                            <ShieldCheck size={16} aria-hidden="true" />
+                            {result.data_mode === "synthetic"
+                              ? "离线合成数据，仅用于接口验收。"
+                              : "单一来源片库 · 未获取豆瓣评分 · 本地观看渠道未知"}
+                          </p>
+                          <details
+                            open={
+                              result.data_mode === "synthetic" ||
+                              result.status === "degraded"
+                            }
+                          >
+                            <summary>
+                              数据边界与说明（{result.warnings.length}）
+                            </summary>
+                            {result.warnings.map((warning, i) => (
+                              <p key={i}>{warning}</p>
+                            ))}
+                          </details>
                         </div>
-                      ))}
+                      )}
                       {result.status === "needs_clarification" && (
                         <div className="clarification">
                           <h3>再补充一点想法</h3>
                           {result.questions.map((q) => (
-                            <div key={q.question_id}>
-                              <p>{q.text}</p>
+                            <fieldset
+                              key={q.question_id}
+                              disabled={
+                                recommend.isPending || clarificationStale
+                              }
+                            >
+                              <legend>{q.text}</legend>
                               <div className="choice-row">
                                 {(q.options ?? []).map((option) => (
-                                  <Button
+                                  <label
+                                    className="clarification-option"
                                     key={option}
-                                    className="secondary"
-                                    disabled={clarificationCount >= 2}
-                                    onClick={() => {
-                                      setDrafts((current) => ({
-                                        ...current,
-                                        [mode]:
-                                          `${current[mode]}\n补充：${q.text}${option}`.slice(
-                                            0,
-                                            2000,
-                                          ),
-                                      }));
-                                      setClarificationCount((n) => n + 1);
-                                      setMessage(
-                                        "已补充到输入。补充文字暂不参与筛选，请使用上方点选条件。",
-                                      );
-                                      setDetailsOpen(true);
-                                      requestAnimationFrame(() =>
-                                        textareaRef.current?.focus(),
-                                      );
-                                    }}
                                   >
+                                    <input
+                                      type="radio"
+                                      name={`clarification-${q.question_id}`}
+                                      value={option}
+                                      checked={
+                                        answers[q.question_id] === option
+                                      }
+                                      onChange={() =>
+                                        setAnswers((current) => ({
+                                          ...current,
+                                          [q.question_id]: option,
+                                        }))
+                                      }
+                                    />
                                     {option}
-                                  </Button>
+                                  </label>
                                 ))}
                               </div>
-                            </div>
+                            </fieldset>
                           ))}
+                          {clarificationStale && (
+                            <p role="status">
+                              条件已变更或会话已过期。请在上方重新提交，旧答案不会继续使用。
+                            </p>
+                          )}
+                          <div className="choice-row">
+                            <Button
+                              className="primary"
+                              onClick={confirmClarification}
+                              disabled={
+                                clarificationStale ||
+                                recommend.isPending ||
+                                !result.clarification_id ||
+                                !result.questions.every((q) =>
+                                  q.options?.includes(answers[q.question_id]),
+                                )
+                              }
+                            >
+                              确认并继续推荐{" "}
+                              <ArrowRight size={17} aria-hidden="true" />
+                            </Button>
+                            <Button
+                              className="secondary"
+                              onClick={() => {
+                                invalidateClarification();
+                                textareaRef.current?.focus();
+                                textareaRef.current?.scrollIntoView({
+                                  block: "center",
+                                });
+                              }}
+                            >
+                              修改观影想法
+                            </Button>
+                          </div>
                           <small>
-                            {clarificationCount >= 2
-                              ? "已达到接口最多 2 次补充的限制。"
-                              : "选择会补充到输入；当前服务只演示澄清，不执行推理。"}
+                            请确认每个问题后继续；也可以修改文字重新提交。确认前不会查询或展示电影候选。
                           </small>
                         </div>
                       )}
                       {result.candidates.length > 0 && (
-                        <Button
-                          className="secondary"
-                          disabled={recommend.isPending}
-                          onClick={() => {
-                            const previous = recommend.variables;
-                            if (previous)
-                              recommend.mutate({
-                                ...previous,
-                                constraints: {
-                                  company: "",
-                                  sort_by: "balanced",
-                                  era: "any",
-                                  ...previous.constraints,
-                                  exclude_movie_ids: [
-                                    ...new Set([
-                                      ...(previous.constraints
-                                        ?.exclude_movie_ids ?? []),
-                                      ...dismissed,
-                                      ...result.candidates.map(
-                                        (c) => c.movie.movie_id,
-                                      ),
-                                    ]),
-                                  ].slice(-500),
-                                },
-                              });
-                          }}
-                        >
-                          换一组真实电影
-                        </Button>
+                        <div className="result-toolbar">
+                          <Button
+                            className="secondary"
+                            onClick={editConditions}
+                          >
+                            修改选片条件
+                          </Button>
+                          <Button
+                            className="secondary"
+                            disabled={recommend.isPending}
+                            onClick={() => {
+                              const previous = resultRequest;
+                              if (previous)
+                                startRecommendation({
+                                  ...previous,
+                                  constraints: {
+                                    company: "",
+                                    sort_by: "balanced",
+                                    era: "any",
+                                    ...previous.constraints,
+                                    exclude_movie_ids: [
+                                      ...new Set([
+                                        ...(previous.constraints
+                                          ?.exclude_movie_ids ?? []),
+                                        ...dismissed,
+                                        ...result.candidates.map(
+                                          (c) => c.movie.movie_id,
+                                        ),
+                                      ]),
+                                    ].slice(-500),
+                                  },
+                                });
+                            }}
+                          >
+                            换一组真实电影
+                          </Button>
+                        </div>
                       )}
                       <div className="candidate-grid">
                         {result.candidates
                           .filter((c) => !hidden.includes(c.movie.movie_id))
-                          .map((c) => card(c.movie, c))}
+                          .map((c, index) => card(c.movie, c, index))}
                       </div>
                       {(result.status === "empty" ||
                         (result.status === "degraded" &&
@@ -1340,9 +1632,7 @@ export default function App() {
                               : "推荐服务暂时降级"
                           }
                         >
-                          <p>
-                            试着放宽片长或减少心情、类型条件，也可以稍后再试。
-                          </p>
+                          <p>试着放宽片长、年代或类型条件，也可以稍后再试。</p>
                           <Button
                             className="secondary"
                             onClick={() => {
@@ -1452,13 +1742,7 @@ export default function App() {
           />
           <Route
             path="/compare"
-            element={
-              <Compare
-                movies={comparison}
-                candidates={knownCandidates}
-                onRemove={compare}
-              />
-            }
+            element={<Compare movies={comparison} onRemove={compare} />}
           />
           <Route
             path="/film/:movieId"
@@ -1635,32 +1919,6 @@ function PageHeading({ title, subtitle }: { title: string; subtitle: string }) {
     </div>
   );
 }
-function Ratings({ movie }: { movie: Movie }) {
-  return (
-    <div className="ratings">
-      {(movie.ratings ?? []).length ? (
-        (movie.ratings ?? []).map((r, i) => (
-          <div key={i}>
-            <strong>
-              {r.value}
-              <small> / {r.scale}</small>
-            </strong>
-            <span>{r.source}</span>
-            <small>
-              {r.vote_count == null
-                ? "票数未提供"
-                : `${r.vote_count.toLocaleString("zh-CN")} 票`}
-            </small>
-          </div>
-        ))
-      ) : (
-        <p>
-          评分：未获取<span>缺少评分不代表评分低</span>
-        </p>
-      )}
-    </div>
-  );
-}
 function Availability({ candidate }: { candidate: Candidate }) {
   const labels = {
     unknown: "观看渠道未知",
@@ -1697,10 +1955,21 @@ function MovieLookup({
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("");
   const [searched, setSearched] = useState(false);
+  const activeSearch = useRef<AbortController | null>(null);
+  const invalidYear =
+    Boolean(year) &&
+    (!Number.isInteger(Number(year)) ||
+      Number(year) < 1888 ||
+      Number(year) > 2200);
   const search = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (input: {
+      query: string;
+      year: string;
+      controller: AbortController;
+    }) => {
       const data = await api<SearchResponse>(
-        `/movies?query=${encodeURIComponent(query.trim())}${year ? `&year=${year}` : ""}`,
+        `/movies?query=${encodeURIComponent(input.query)}${input.year ? `&year=${input.year}` : ""}`,
+        { signal: input.controller.signal },
       );
       if (
         !Array.isArray(data.movies) ||
@@ -1710,10 +1979,19 @@ function MovieLookup({
       return data;
     },
   });
+  useEffect(() => () => activeSearch.current?.abort(), []);
+  const invalidateSearch = () => {
+    activeSearch.current?.abort();
+    activeSearch.current = null;
+    search.reset();
+    setSearched(false);
+  };
   const run = () => {
-    if (query.trim() && !search.isPending) {
+    if (query.trim() && !invalidYear && !search.isPending) {
+      const controller = new AbortController();
+      activeSearch.current = controller;
       setSearched(true);
-      search.mutate();
+      search.mutate({ query: query.trim(), year, controller });
     }
   };
   return (
@@ -1728,9 +2006,9 @@ function MovieLookup({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setSearched(false);
+              invalidateSearch();
             }}
-            placeholder="试试：春日来信"
+            placeholder="输入来源原文片名"
             maxLength={100}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -1751,24 +2029,32 @@ function MovieLookup({
             min="1888"
             max="2200"
             value={year}
+            aria-invalid={invalidYear || undefined}
+            aria-describedby={
+              invalidYear ? `year-error-${chooseLabel}` : undefined
+            }
             onChange={(e) => {
               setYear(e.target.value);
-              setSearched(false);
+              invalidateSearch();
             }}
             placeholder="如 2024"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                run();
+              }
+            }}
           />
+          {invalidYear && (
+            <small id={`year-error-${chooseLabel}`} role="alert">
+              年份请输入 1888–2200 之间的整数。
+            </small>
+          )}
         </div>
         <Button
           type="button"
           className="secondary"
-          disabled={
-            !query.trim() ||
-            search.isPending ||
-            (!!year &&
-              (Number(year) < 1888 ||
-                Number(year) > 2200 ||
-                !Number.isInteger(Number(year))))
-          }
+          disabled={!query.trim() || search.isPending || invalidYear}
           onClick={run}
         >
           <Search size={16} />
@@ -1788,7 +2074,7 @@ function MovieLookup({
               ? search.data.requires_confirmation
                 ? "找到同名影片，请确认具体年份。"
                 : "请核对影片后确认。"
-              : "没有找到影片。试试“春日来信”或“远星航线”。"}
+              : "没有找到影片。请核对来源原文片名，或清空年份后重试；当前仅检索 Apple 美国区分类榜单。"}
           </p>
           {search.data.movies.map((m) => (
             <div className="lookup-item" key={m.movie_id}>
@@ -1827,7 +2113,8 @@ function FilmPage({
   const existing = candidates.find((c) => c.movie.movie_id === movieId);
   const query = useQuery({
     queryKey: ["film", movieId],
-    queryFn: () => api<Movie>(`/movies/${encodeURIComponent(movieId!)}`),
+    queryFn: ({ signal }) =>
+      api<Movie>(`/movies/${encodeURIComponent(movieId!)}`, { signal }),
     enabled: !existing,
     staleTime: 60000,
   });
@@ -1853,7 +2140,7 @@ function FilmPage({
       <div className="notice">
         <Info />
         <span>
-          当前接口未提供剧情简介、演职员与海报。页面不补造影片内容；观看渠道需要独立核实。
+          当前资料包含来源提供的导演、海报等字段，缺失项保持未知；口碑评分、影评与本地观看渠道尚未接入。
         </span>
       </div>
     </>
@@ -1861,20 +2148,19 @@ function FilmPage({
 }
 function Compare({
   movies,
-  candidates,
   onRemove,
 }: {
-  movies: Movie[];
-  candidates: Candidate[];
+  movies: ComparedMovie[];
   onRemove: (m: Movie) => void;
 }) {
   const ids = movies.map((m) => m.movie_id);
   const query = useQuery({
     queryKey: ["compare", ...ids],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api<SearchResponse>("/comparisons", {
         method: "POST",
         body: JSON.stringify({ movie_ids: ids }),
+        signal,
       }),
     enabled: ids.length >= 2,
     staleTime: 60000,
@@ -1906,7 +2192,7 @@ function Compare({
           <div className="notice">
             <Info />
             <span>
-              对比接口仅提供基础资料。推荐理由沿用本次已有结果；未获取的评分和渠道保持未知。
+              基础资料由对比接口提供。推荐与证据沿用加入对比时的快照，未获取的评分和渠道保持未知。不同影片的来源观点并列展示，不生成未经证实的差异结论。
             </span>
           </div>
           {query.data && (
@@ -1951,14 +2237,17 @@ function Compare({
                       "标签",
                       "评分",
                       "推荐理由",
+                      "来源观点",
+                      "证据与出处",
                       "观看渠道",
                     ].map((row, i) => (
                       <tr key={row}>
                         <th scope="row">{row}</th>
                         {query.data!.movies.map((m) => {
-                          const c = candidates.find(
-                            (c) => c.movie.movie_id === m.movie_id,
-                          );
+                          const snapshot = movies.find(
+                            (selected) => selected.movie_id === m.movie_id,
+                          )?.snapshot;
+                          const c = snapshot?.candidate;
                           return (
                             <td key={m.movie_id}>
                               {i === 0 ? (
@@ -1970,9 +2259,34 @@ function Compare({
                               ) : i === 3 ? (
                                 (m.tags ?? []).join(" / ") || "未提供"
                               ) : i === 4 ? (
-                                <Ratings movie={c?.movie ?? m} />
+                                <Ratings
+                                  movie={c?.movie ?? m}
+                                  evidence={snapshot?.evidence}
+                                />
                               ) : i === 5 ? (
-                                (c?.reason.text ?? "本次尚未获取")
+                                c ? (
+                                  <>
+                                    <small className="muted">
+                                      {reasonLabels[c.reason.kind]}
+                                    </small>
+                                    <p>{c.reason.text}</p>
+                                  </>
+                                ) : (
+                                  "本次尚未获取"
+                                )
+                              ) : i === 6 ? (
+                                <SourceOpinions
+                                  movie={m}
+                                  evidence={snapshot?.evidence ?? []}
+                                />
+                              ) : i === 7 ? (
+                                <EvidencePanel
+                                  movie={c?.movie ?? m}
+                                  candidate={c}
+                                  evidence={snapshot?.evidence ?? []}
+                                  dataMode={snapshot?.dataMode}
+                                  snapshot={Boolean(snapshot)}
+                                />
                               ) : c ? (
                                 <Availability candidate={c} />
                               ) : (
@@ -2009,10 +2323,12 @@ function About() {
           30 分钟，保留采集时间。
         </p>
       </div>
+      <ServiceStatus />
+      <h2 className="section-heading">页面功能与使用边界</h2>
       <div
         className="table-scroll"
         role="region"
-        aria-label="能力接入状态"
+        aria-label="页面功能与使用边界"
         tabIndex={0}
       >
         <table className="capabilities">
@@ -2027,13 +2343,13 @@ function About() {
             {[
               [
                 "影片查找与身份确认",
-                "真实资料可用",
+                "按资料源查找",
                 "按来源原文片名检索并确认年份，最多 50 条。商店搜索无电影结果时查当前分类榜单；未覆盖的影片可能查不到。推荐候选仍来自分类榜单。",
               ],
               [
                 "类型、心情与片长匹配",
                 "规则匹配已接入",
-                "类型、年代、片长为硬条件；心情结合类型和简介词法线索排序，支持均衡探索或榜单顺序。补充文字理解尚未实现。",
+                "文字通过规则解析常见类型、心情、时长、年代与排除；冲突或无法执行的条件需确认后才查询片库。类型、年代和片长为硬条件，文字心情仅辅助召回与排序。不具备通用模型理解能力。",
               ],
               [
                 "影片对比",
@@ -2046,7 +2362,7 @@ function About() {
                 "片单与排除影片保存在页面内存；排除会传入后续选片条件，支持撤销。刷新清空，不保存长期偏好。",
               ],
               [
-                "海报与评分",
+                "来源海报",
                 "海报已接入",
                 "使用来源海报并链接对应商店。评分、影评与剧情总结尚未接入。",
               ],

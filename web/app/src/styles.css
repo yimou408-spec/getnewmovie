@@ -1168,12 +1168,15 @@ main:focus-visible .intro h1 {
   gap: 16px;
   padding: 12px 0;
   font-size: 13px;
+  flex-wrap: wrap;
 }
 .ratings > div {
   display: flex;
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .ratings strong {
   font-size: 22px;
@@ -1354,6 +1357,62 @@ main:focus-visible .intro h1 {
 }
 .clarification small {
   color: var(--muted);
+}
+.natural-input {
+  margin-bottom: 24px;
+}
+.intent-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.intent-summary h3 {
+  font-size: 17px;
+}
+.intent-method {
+  color: var(--muted);
+  font-size: 13px;
+}
+.intent-summary ul {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+.intent-warning {
+  color: var(--warning);
+}
+.clarification fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+.clarification legend {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.clarification-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--surface);
+}
+.clarification-option:has(:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.clarification-option input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
 }
 .page-heading {
   padding: 36px 0 28px;
@@ -2085,6 +2144,7 @@ footer > a {
   .movie-body > .availability,
   .movie-body > .movie-actions,
   .movie-body > .sources,
+  .movie-body > .evidence-panel,
   .movie-body > .text-button {
     margin-left: -100px;
   }

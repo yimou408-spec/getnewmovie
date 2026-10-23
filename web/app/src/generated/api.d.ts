@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  "/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create Session */
+    post: operations["create_session_sessions_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/health": {
     parameters: {
       query?: never;
@@ -127,6 +144,20 @@ export interface components {
       /** Availability */
       availability: components["schemas"]["Availability"][];
     };
+    /** ClarificationAnswer */
+    ClarificationAnswer: {
+      /** Question Id */
+      question_id: string;
+      /** Option */
+      option: string;
+    };
+    /** ClarificationSubmission */
+    ClarificationSubmission: {
+      /** Clarification Id */
+      clarification_id: string;
+      /** Answers */
+      answers: components["schemas"]["ClarificationAnswer"][];
+    };
     /** ComparisonRequest */
     ComparisonRequest: {
       /** Movie Ids */
@@ -208,7 +239,10 @@ export interface components {
         | "UPSTREAM_RATE_LIMIT"
         | "NOT_CONFIGURED"
         | "NOT_FOUND"
-        | "INVALID_SCENARIO";
+        | "INVALID_SCENARIO"
+        | "SESSION_EXPIRED"
+        | "STALE_CLARIFICATION"
+        | "INVALID_CLARIFICATION";
       /** Message */
       message: string;
       /** Retryable */
@@ -246,6 +280,36 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
+    };
+    /** HealthResponse */
+    HealthResponse: {
+      /** Service */
+      service: string;
+      /** Provider */
+      provider: string;
+      /** Synthetic Fallback */
+      synthetic_fallback: boolean;
+      /** Cache Ttl Seconds */
+      cache_ttl_seconds: number;
+      capabilities?: components["schemas"]["ServiceCapabilities"] | null;
+    };
+    /** Interpretation */
+    Interpretation: {
+      /**
+       * Method
+       * @default rules-v1
+       * @constant
+       */
+      method: "rules-v1";
+      effective_constraints: components["schemas"]["Constraints"];
+      /** Hard Conditions */
+      hard_conditions?: string[];
+      /** Soft Preferences */
+      soft_preferences?: string[];
+      /** Conflicts */
+      conflicts?: string[];
+      /** Unhandled */
+      unhandled?: string[];
     };
     /** Movie */
     Movie: {
@@ -351,6 +415,13 @@ export interface components {
       /** Watchlist Movie Ids */
       watchlist_movie_ids?: string[];
       constraints?: components["schemas"]["Constraints"];
+      /**
+       * Input Source
+       * @default structured
+       * @enum {string}
+       */
+      input_source: "structured" | "natural_language";
+      clarification?: components["schemas"]["ClarificationSubmission"] | null;
     };
     /** RecommendationResponse */
     RecommendationResponse: {
@@ -386,6 +457,52 @@ export interface components {
       catalog_size?: number | null;
       /** Matched Count */
       matched_count?: number | null;
+      interpretation?: components["schemas"]["Interpretation"] | null;
+      /** Clarification Id */
+      clarification_id?: string | null;
+    };
+    /**
+     * ServiceCapabilities
+     * @description Implemented paths only, not a claim of upstream availability or quality.
+     */
+    ServiceCapabilities: {
+      /**
+       * Metadata
+       * @default false
+       */
+      metadata: boolean;
+      /**
+       * Ratings
+       * @default false
+       */
+      ratings: boolean;
+      /**
+       * Reviews
+       * @default false
+       */
+      reviews: boolean;
+      /**
+       * Natural Language
+       * @default false
+       */
+      natural_language: boolean;
+      /**
+       * Long Term Memory
+       * @default false
+       */
+      long_term_memory: boolean;
+      /**
+       * Local Availability
+       * @default false
+       */
+      local_availability: boolean;
+    };
+    /** SessionResponse */
+    SessionResponse: {
+      /** Session Id */
+      session_id: string;
+      /** Expires In Seconds */
+      expires_in_seconds: number;
     };
     /** ValidationError */
     ValidationError: {
@@ -409,6 +526,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  create_session_sessions_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SessionResponse"];
+        };
+      };
+    };
+  };
   health_health_get: {
     parameters: {
       query?: never;
@@ -424,7 +561,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["HealthResponse"];
         };
       };
     };

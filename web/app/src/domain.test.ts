@@ -50,4 +50,13 @@ describe("truthful contract boundary", () => {
       buildRequest("discover", "电影", "CN", "0", [], undefined),
     ).toThrow();
   });
+  it("does not require optional prose after choosing a film or a watchlist", () => {
+    const movie = success.candidates[0].movie;
+    expect(
+      buildRequest("known_movie", "", "CN", "", [], movie).query,
+    ).toBeTruthy();
+    expect(
+      buildRequest("watchlist", "   ", "CN", "", [movie.movie_id]).query,
+    ).toBeTruthy();
+  });
 });

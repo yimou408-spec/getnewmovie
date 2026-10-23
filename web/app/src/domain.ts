@@ -19,6 +19,9 @@ export function validateResponse(raw: unknown): Recommendation {
   if (!responseValid(raw))
     throw new Error("服务返回的数据与接口约定不一致，请重试。");
   const ids = new Set(raw.candidates.map((c) => c.movie.movie_id));
+  const evidence = new Map(raw.evidence.map((e) => [e.evidence_id, e]));
+  if (evidence.size !== raw.evidence.length)
+    throw new Error("来源证据编号重复，无法核对出处。");
   if (
     ids.size !== raw.candidates.length ||
     (raw.status === "ready" && !ids.size) ||
@@ -31,7 +34,10 @@ export function validateResponse(raw: unknown): Recommendation {
   for (const c of raw.candidates) {
     if (c.movie.ratings?.some((r) => r.value > r.scale))
       throw new Error("评分超出了来源量表。");
-    for (const id of c.reason.evidence_ids) {
+    for (const id of [
+      ...c.reason.evidence_ids,
+      ...(c.movie.ratings ?? []).map((r) => r.evidence_id),
+    ]) {
       if (
         !raw.evidence.some(
           (e) =>
@@ -42,6 +48,12 @@ export function validateResponse(raw: unknown): Recommendation {
       )
         throw new Error("推荐理由缺少可核对的安全来源。");
     }
+    if (
+      c.movie.ratings?.some(
+        (r) => evidence.get(r.evidence_id)?.source !== r.source,
+      )
+    )
+      throw new Error("评分平台与引用来源不一致。");
   }
   return raw;
 }
@@ -106,7 +118,14 @@ export function buildRequest(
     throw new Error("时长请输入 1–600 分钟的整数。");
   const request: Request = {
     mode,
-    query: query.trim(),
+    input_source: "structured",
+    query:
+      query.trim() ||
+      (mode === "known_movie"
+        ? "查看这部已确认影片的资料与匹配结果。"
+        : mode === "watchlist"
+          ? "从本次片单中选择电影。"
+          : ""),
     region,
     session_id: "frontend-session",
     memory_enabled: false,
@@ -135,8 +154,12 @@ export class ApiError extends Error {
     message: string,
     public trace?: string,
     public retryable = true,
+    public kind = "service",
+    public status?: number,
+    public code?: string,
   ) {
     super(message);
+    this.name = "ApiError";
   }
 }
 export async function api<T>(
@@ -144,45 +167,119 @@ export async function api<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 45000);
+  const callerSignal = options.signal;
+  const cancel = () => controller.abort();
+  let timedOut = false;
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 45000);
+  callerSignal?.addEventListener("abort", cancel, { once: true });
   try {
+    if (callerSignal?.aborted) controller.abort();
+    if (controller.signal.aborted)
+      throw new DOMException("aborted", "AbortError");
+    const headers = new Headers(options.headers);
+    if (!headers.has("Content-Type"))
+      headers.set("Content-Type", "application/json");
     const res = await fetch(`/api${path}`, {
       ...options,
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", ...options.headers },
+      headers,
     });
-    const raw = await res.json();
+    let raw: unknown;
+    try {
+      raw = await res.json();
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      if (res.ok)
+        throw new ApiError(
+          "服务返回的内容无法读取，请重试。",
+          undefined,
+          true,
+          "invalid_response",
+          res.status,
+        );
+    }
     if (!res.ok) {
-      const message =
+      const body =
+        raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      const code = typeof body.code === "string" ? body.code : undefined;
+      if (code === "SESSION_EXPIRED" || code === "STALE_CLARIFICATION")
+        throw new ApiError(
+          code === "SESSION_EXPIRED"
+            ? "临时会话已过期，请重新提交观影想法。"
+            : "条件已变更，请重新提交，旧澄清答案不会继续使用。",
+          typeof body.trace_id === "string" ? body.trace_id : undefined,
+          false,
+          "session",
+          res.status,
+          code,
+        );
+      const [kind, message, retryable] =
         res.status === 422
-          ? "输入未通过服务校验，请检查内容。"
-          : raw.code === "NOT_CONFIGURED"
-            ? "推荐服务尚未配置，请稍后再试。"
-            : raw.code === "UPSTREAM_RATE_LIMIT"
-              ? "资料源请求较多，请一分钟后重试。"
-              : raw.code === "UPSTREAM_UNAVAILABLE"
-                ? "电影资料源暂时不可用，已有结果仍可查看。"
-                : raw.code === "UPSTREAM_TIMEOUT"
-                  ? "推荐服务响应超时，可以重试。"
+          ? (["validation", "输入未通过服务校验，请检查内容。", false] as const)
+          : code === "NOT_CONFIGURED"
+            ? ([
+                "not_configured",
+                "推荐服务尚未配置，请稍后再试。",
+                false,
+              ] as const)
+            : code === "UPSTREAM_RATE_LIMIT" || res.status === 429
+              ? ([
+                  "rate_limit",
+                  "资料源请求较多，请一分钟后重试。",
+                  true,
+                ] as const)
+              : code === "UPSTREAM_TIMEOUT" || res.status === 504
+                ? (["timeout", "推荐服务响应超时，可以重试。", true] as const)
+                : code === "UPSTREAM_UNAVAILABLE" || res.status === 503
+                  ? ([
+                      "unavailable",
+                      "电影资料源暂时不可用，已有结果仍可查看。",
+                      true,
+                    ] as const)
                   : res.status === 404
-                    ? "没有找到这部影片，请重新查找。"
-                    : "服务暂时无法完成请求，请重试。";
+                    ? ([
+                        "not_found",
+                        "没有找到这部影片，请重新查找。",
+                        false,
+                      ] as const)
+                    : ([
+                        "service",
+                        "服务暂时无法完成请求，请重试。",
+                        res.status >= 500,
+                      ] as const);
       throw new ApiError(
         message,
-        typeof raw.trace_id === "string" ? raw.trace_id : undefined,
-        raw.retryable !== false,
+        typeof body.trace_id === "string" ? body.trace_id : undefined,
+        retryable && body.retryable !== false,
+        kind,
+        res.status,
+        code,
       );
     }
+    if (controller.signal.aborted)
+      throw new DOMException("aborted", "AbortError");
     return raw as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    if (controller.signal.aborted)
+      throw new ApiError(
+        timedOut ? "等待超过 45 秒，请重试。" : "已取消本次请求。",
+        undefined,
+        timedOut,
+        timedOut ? "timeout" : "cancelled",
+      );
     throw new ApiError(
-      error instanceof DOMException && error.name === "AbortError"
-        ? "等待超过 45 秒，请重试。"
-        : "连接失败，请确认本地服务已启动后重试。",
+      "连接失败，请确认本地服务已启动后重试。",
+      undefined,
+      true,
+      "network",
     );
   } finally {
     window.clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", cancel);
   }
 }
 export type SearchResponse = components["schemas"]["MovieSearchResponse"];

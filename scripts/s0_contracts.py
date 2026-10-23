@@ -10,6 +10,25 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ServiceCapabilities(StrictModel):
+    """Implemented paths only, not a claim of upstream availability or quality."""
+    metadata: bool = False
+    ratings: bool = False
+    reviews: bool = False
+    natural_language: bool = False
+    long_term_memory: bool = False
+    local_availability: bool = False
+
+
+class HealthResponse(StrictModel):
+    service: str
+    provider: str
+    synthetic_fallback: bool
+    cache_ttl_seconds: int = Field(ge=0)
+    # Optional for compatibility with the previously deployed health response.
+    capabilities: ServiceCapabilities | None = None
+
+
 class Constraints(StrictModel):
     max_runtime_minutes: int | None = Field(default=None, ge=1, le=600)
     exclude_movie_ids: list[str] = Field(default_factory=list, max_length=500)
@@ -22,6 +41,30 @@ class Constraints(StrictModel):
     era: Literal["any", "recent", "2000s", "classic"] = "any"
 
 
+class ClarificationAnswer(StrictModel):
+    question_id: str = Field(min_length=1, max_length=100)
+    option: str = Field(min_length=1, max_length=100)
+
+
+class ClarificationSubmission(StrictModel):
+    clarification_id: str = Field(min_length=1, max_length=100)
+    answers: list[ClarificationAnswer] = Field(min_length=1, max_length=2)
+
+
+class SessionResponse(StrictModel):
+    session_id: str
+    expires_in_seconds: int
+
+
+class Interpretation(StrictModel):
+    method: Literal["rules-v1"] = "rules-v1"
+    effective_constraints: Constraints
+    hard_conditions: list[str] = Field(default_factory=list)
+    soft_preferences: list[str] = Field(default_factory=list)
+    conflicts: list[str] = Field(default_factory=list)
+    unhandled: list[str] = Field(default_factory=list)
+
+
 class RecommendationRequest(StrictModel):
     mode: Literal["discover", "watchlist", "known_movie"]
     query: str = Field(min_length=1, max_length=2000)
@@ -32,6 +75,8 @@ class RecommendationRequest(StrictModel):
     movie_id: str | None = None
     watchlist_movie_ids: list[str] = Field(default_factory=list, max_length=500)
     constraints: Constraints = Field(default_factory=Constraints)
+    input_source: Literal["structured", "natural_language"] = "structured"
+    clarification: ClarificationSubmission | None = None
 
     @model_validator(mode="after")
     def check_mode(self):
@@ -39,6 +84,8 @@ class RecommendationRequest(StrictModel):
             raise ValueError("watchlist mode needs confirmed movie IDs")
         if self.mode == "known_movie" and not self.movie_id:
             raise ValueError("known_movie mode needs resolved movie_id; use /movies for lookup")
+        if self.clarification is not None and self.input_source != "natural_language":
+            raise ValueError("clarification requires natural language input")
         return self
 
 
@@ -123,6 +170,8 @@ class RecommendationResponse(StrictModel):
     memory_used: bool
     catalog_size: int | None = Field(default=None, ge=0)
     matched_count: int | None = Field(default=None, ge=0)
+    interpretation: Interpretation | None = None
+    clarification_id: str | None = None
 
     @model_validator(mode="after")
     def validate_state_and_references(self):
@@ -161,7 +210,7 @@ class ErrorResponse(StrictModel):
     contract_version: Literal["0.1.0"] = VERSION
     trace_id: str
     data_mode: Literal["synthetic", "live", "cached"]
-    code: Literal["UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RATE_LIMIT", "NOT_CONFIGURED", "NOT_FOUND", "INVALID_SCENARIO"]
+    code: Literal["UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RATE_LIMIT", "NOT_CONFIGURED", "NOT_FOUND", "INVALID_SCENARIO", "SESSION_EXPIRED", "STALE_CLARIFICATION", "INVALID_CLARIFICATION"]
     message: str
     retryable: bool
 

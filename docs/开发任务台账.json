@@ -54,8 +54,14 @@
       "acceptance": "现有点选、比较、片单与明暗主题保留；明确新增自然语言、证据和记忆交互。",
       "verification": "核对S0六类状态；记录环境版本。",
       "depends_on": [],
-      "status": "not_started",
-      "evidence": null
+      "status": "ready_for_review",
+      "evidence": "docs/frontend/p01-20261021.md",
+      "updated_on": "2026-10-21",
+      "completion_note": "现状清点与六状态回归已交付，待主审。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "计划工时保留；实际个人投入未知，自动执行与外部等待不按人时计。",
+      "blockers": []
     },
     {
       "id": "P01",
@@ -74,8 +80,16 @@
         "P00",
         "Y00"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "implementation_ready_pending_integration",
+      "evidence": "docs/frontend/p01-20261021.md",
+      "updated_on": "2026-10-21",
+      "completion_note": "请求、取消、能力声明与生成契约已实现并自测，待 Y00 契约确认及主审。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "计划工时保留；实际个人投入未知，自动执行与外部等待不按人时计。",
+      "blockers": [
+        "Y00 契约差异交付未见；capabilities 增量需 Y00/Y02 复核。"
+      ]
     },
     {
       "id": "P01-Q",
@@ -94,8 +108,16 @@
         "P01",
         "Y01"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "partially_completed",
+      "evidence": "docs/frontend/p01-20261021.md",
+      "updated_on": "2026-10-21",
+      "completion_note": "自身回归通过；Y01 交叉评审及联合联调待上游交付。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "计划工时保留；实际个人投入未知，自动执行与外部等待不按人时计。",
+      "blockers": [
+        "未见 Y00/Y01 开放交付 PR，无法完成真实交叉评审与联合联调。"
+      ]
     },
     {
       "id": "P02",
@@ -114,8 +136,15 @@
         "P01",
         "Y00"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "implementation_ready_pending_review",
+      "evidence": "docs/frontend/p02-20261022.md；PR #4；本机 Chrome 172/172（四组合各43）、前端单元27、后端57通过；云端以PR最新提交记录为准。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "计划工时保留；实际个人投入未知，自动执行与外部等待不按人时计。",
+      "blockers": [
+        "2284266609-code 独立主审待完成。",
+        "Y00/Y02 共享契约、会话字段及版本待共同确认；不得代签。"
+      ]
     },
     {
       "id": "P02-Q",
@@ -134,8 +163,15 @@
         "P02",
         "Y02"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "self_test_passed_review_integration_pending",
+      "evidence": "docs/frontend/p02-20261022.md；自然语言→澄清→真实推荐及重试、取消、乱序四组合回归通过；保留输入、响应与trace_id附件。",
+      "review_status": "pending",
+      "actual_hours": null,
+      "actual_hours_note": "仅记录实际完成的本模块回归；跨成员等待不计完成工时。",
+      "blockers": [
+        "2026-10-22 查询仓库全部PR，仅有#1/#2/#3/#4，未见可识别的 yimou408-spec Y02 实现交付PR，交叉评审待交付。",
+        "Y02共享身份/契约与C03/C04规则/主图联合联调待对应成员交付；当前规则适配器不代替其任务。"
+      ]
     },
     {
       "id": "P03",
@@ -155,8 +191,13 @@
         "Y02",
         "C02"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "implementation_ready_pending_review",
+      "evidence": "docs/frontend/p03-20261023.md；PR #4；本机Chrome204/204（四组合各51）、前端单元34、后端57、类型/格式/构建通过；云端以PR最新提交Actions为准。",
+      "blockers": [
+        "2284266609-code独立主审待完成。",
+        "Y02/C02真实评分、影评及多源身份响应待交付；当前Apple元数据不等于口碑核验。"
+      ],
+      "actual_hours": null
     },
     {
       "id": "P03-Q",
@@ -175,8 +216,12 @@
         "P03",
         "Y03"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "self_test_passed_review_integration_pending",
+      "evidence": "docs/frontend/p03-20261023.md；PR #4；本机Chrome204/204（四组合各51）、前端单元34、后端57、类型/格式/构建通过；云端以PR最新提交Actions为准。",
+      "blockers": [
+        "Y03尚无可识别实现交付，交叉评审和三方联调待对应成员交付，不代签。"
+      ],
+      "actual_hours": null
     },
     {
       "id": "P04",
@@ -195,8 +240,12 @@
         "P03",
         "C03"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "partial_frontend_ready_backend_pending",
+      "evidence": "docs/frontend/p03-20261023.md；PR #4；本机Chrome204/204（四组合各51）、前端单元34、后端57、类型/格式/构建通过；云端以PR最新提交Actions为准。",
+      "blockers": [
+        "比较证据快照、来源观点并列已实现；持久化event_id、幂等反馈、服务端已看与临时意愿分离依赖C03/服务契约，未接入。"
+      ],
+      "actual_hours": null
     },
     {
       "id": "P04-Q",
@@ -236,8 +285,12 @@
         "Y04",
         "C04"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "partial_current_service_verified_integration_pending",
+      "evidence": "docs/frontend/p03-20261023.md；PR #4；本机Chrome204/204（四组合各51）、前端单元34、后端57、类型/格式/构建通过；云端以PR最新提交Actions为准。",
+      "blockers": [
+        "当前Apple+规则自然语言/澄清链路已验；Y04/C04多源、模型/Agent及真实失败降级联合验收待交付。"
+      ],
+      "actual_hours": null
     },
     {
       "id": "P05-Q",
@@ -277,7 +330,10 @@
         "Y03"
       ],
       "status": "not_started",
-      "evidence": null
+      "evidence": null,
+      "preparation_note": "统一试用脚本和匿名记录模板已准备；Y03/记忆接口、跨会话操作与3–5名真实试用未执行。",
+      "preparation_evidence": "docs/frontend/handoff-20261023.md",
+      "actual_hours": null
     },
     {
       "id": "P06-Q",
@@ -318,8 +374,12 @@
         "Y06",
         "C06"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "partial_current_scope_verified_future_paths_pending",
+      "evidence": "docs/frontend/p03-20261023.md；PR #4；本机Chrome204/204（四组合各51）、前端单元34、后端57、类型/格式/构建通过；云端以PR最新提交Actions为准。",
+      "blockers": [
+        "当前路径四组合、键盘与axe已验；未来记忆、多源及最终降级接入后须补验，不签整项完成。"
+      ],
+      "actual_hours": null
     },
     {
       "id": "P07-Q",
@@ -359,8 +419,12 @@
         "Y07",
         "C07"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "partial_current_docs_ready_final_freeze_pending",
+      "evidence": "docs/frontend/p03-20261023.md；PR #4；本机Chrome204/204（四组合各51）、前端单元34、后端57、类型/格式/构建通过；云端以PR最新提交Actions为准。",
+      "blockers": [
+        "当前操作说明、截图、固定演示与故障说明已更新；Y07/C07及最终冻结版本复验待完成。"
+      ],
+      "actual_hours": null
     },
     {
       "id": "P08-Q",
@@ -399,7 +463,10 @@
         "P08"
       ],
       "status": "not_started",
-      "evidence": null
+      "evidence": null,
+      "preparation_note": "冻结版本交付终检清单已准备；最终冒烟、独立签字和正式交付未完成。",
+      "preparation_evidence": "docs/frontend/handoff-20261023.md",
+      "actual_hours": null
     },
     {
       "id": "P10",
