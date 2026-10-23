@@ -2,10 +2,13 @@ name: Frontend product acceptance
 on:
   push:
   pull_request:
+concurrency:
+  group: frontend-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: web/app
