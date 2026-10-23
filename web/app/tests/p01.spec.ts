@@ -95,10 +95,10 @@ for (const [name, body, status] of [
       return route.fulfill({ json: body, status });
     });
     await page.goto("/");
-  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+    await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+    await page
+      .getByRole("button", { name: "我有一点想法", exact: true })
+      .click();
     if ("candidates" in body) {
       await expect(page.locator(".candidate-grid > article")).toHaveCount(
         body.candidates.length,
