@@ -99,8 +99,7 @@ export function ServiceStatusView({ health }: { health: Health }) {
 export function ServiceStatus() {
   const query = useQuery({
     queryKey: ["service-capabilities"],
-    queryFn: async ({ signal }) =>
-      validateHealth(await api("/health", { signal })),
+    queryFn: async () => validateHealth(await api("/health")),
     staleTime: 30000,
     retry: false,
   });
