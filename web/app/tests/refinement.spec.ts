@@ -123,8 +123,14 @@ test("real refinement: remove one condition, submit it and return without losing
   expect(errors).toEqual([]);
 });
 
-test("film-first home loads real films before asking for input and rerolls", async ({ page }, info) => {
-  const response = page.waitForResponse((r) => r.url().endsWith("/api/recommendations") && r.request().method() === "POST");
+test("film-first home loads real films before asking for input and rerolls", async ({
+  page,
+}, info) => {
+  const response = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/recommendations") &&
+      r.request().method() === "POST",
+  );
   await page.goto("/");
   const initial = await response;
   expect(initial.status()).toBe(200);
@@ -132,20 +138,53 @@ test("film-first home loads real films before asking for input and rerolls", asy
   expect(["live", "cached"]).toContain(data.data_mode);
   await expect(page.locator(".stage-film")).toHaveCount(3);
   await expect(page.locator(".filter-workbench")).not.toHaveAttribute("open");
-  await expect(page.getByLabel("说说今晚想看什么（可选）", { exact: true })).not.toBeVisible();
+  await expect(
+    page.getByLabel("说说今晚想看什么（可选）", { exact: true }),
+  ).not.toBeVisible();
   for (const image of await page.locator(".poster-stage img").all()) {
-    await expect.poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0), { timeout: 20000 }).toBe(true);
+    await expect
+      .poll(
+        () =>
+          image.evaluate(
+            (el: HTMLImageElement) => el.complete && el.naturalWidth > 0,
+          ),
+        { timeout: 20000 },
+      )
+      .toBe(true);
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: `${screenshots}/${info.project.name}-film-first.png`, fullPage: true });
-  const next = page.waitForResponse((r) => r.url().endsWith("/api/recommendations") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "换一组真实电影", exact: true }).click();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-film-first.png`,
+    fullPage: true,
+  });
+  const next = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/recommendations") &&
+      r.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "换一组真实电影", exact: true })
+    .click();
   const rerolled = await next;
   expect(rerolled.status()).toBe(200);
   const ids = data.candidates.map((c: any) => c.movie.movie_id);
-  expect(rerolled.request().postDataJSON().constraints.exclude_movie_ids).toEqual(expect.arrayContaining(ids));
-  expect((await rerolled.json()).candidates.every((c: any) => !ids.includes(c.movie.movie_id))).toBe(true);
-  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "精细选片", exact: true })).toBeFocused();
+  expect(
+    rerolled.request().postDataJSON().constraints.exclude_movie_ids,
+  ).toEqual(expect.arrayContaining(ids));
+  expect(
+    (await rerolled.json()).candidates.every(
+      (c: any) => !ids.includes(c.movie.movie_id),
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("button", { name: "我有一点想法", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "精细选片", exact: true }),
+  ).toBeFocused();
   await expect(page.locator(".filter-workbench")).toHaveAttribute("open", "");
 });
