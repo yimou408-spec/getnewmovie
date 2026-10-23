@@ -154,6 +154,8 @@ class AppleCatalog:
             movie.genres = sorted(set(movie.genres) | membership[mid])
             if mid in posters:
                 movie.poster_url = HttpUrl(posters[mid])
+                # Detail and artwork requests must retain RSS-only poster metadata.
+                self.records[mid][1].poster_url = movie.poster_url
         return films
 
     def search(self, query, year=None):
