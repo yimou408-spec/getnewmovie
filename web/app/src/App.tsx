@@ -14,8 +14,9 @@ import {
   useNavigate,
   useParams,
 } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Tabs from "@radix-ui/react-tabs";
+import { DiscoveryHero } from "./discovery-hero";
 import * as Checkbox from "@radix-ui/react-checkbox";
 import {
   ArrowRight,
@@ -232,11 +233,6 @@ function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
   >("loading");
   const [attempt, setAttempt] = useState(0);
   const url = safeSourceUrl(movie.poster_url);
-  const imageUrl = url ? new URL(url) : undefined;
-  // A stalled image request can survive removal and absorb a same-URL retry.
-  // Keep the provider asset/path and give an explicit retry a new request URL.
-  if (attempt > 0)
-    imageUrl?.searchParams.set("_artwork_retry", String(attempt));
   const canShow =
     url &&
     new URL(url).hostname.endsWith(".mzstatic.com") &&
@@ -259,7 +255,7 @@ function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
           <>
             <img
               key={attempt}
-              src={imageUrl?.href}
+              src={`/api/artwork/${encodeURIComponent(movie.movie_id)}?attempt=${attempt}`}
               alt={`${movie.title} 海报`}
               loading="eager"
               decoding="async"
@@ -366,7 +362,8 @@ export default function App() {
   const [selected, setSelected] = useState<Movie>();
   const [saved, setSaved] = useState<Movie[]>([]);
   const [comparison, setComparison] = useState<ComparedMovie[]>([]);
-  const [result, setResult] = useState<Recommendation>();
+  const [submittedResult, setResult] = useState<Recommendation>();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [resultRequest, setResultRequest] =
     useState<ReturnType<typeof buildRequest>>();
   const [snapshotQuery, setSnapshotQuery] = useState("");
@@ -396,7 +393,32 @@ export default function App() {
   const discoverRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [pathKey, setPathKey] = useState(location.pathname);
+  const opening = useQuery({
+    queryKey: ["opening-selection", region],
+    enabled: location.pathname === "/" && !submittedResult,
+    staleTime: 1800000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    queryFn: async ({ signal }) =>
+      validateResponse(
+        await api("/recommendations", {
+          method: "POST",
+          signal,
+          body: JSON.stringify(
+            buildRequest(
+              "discover",
+              discoverQuery(emptyPreferences, ""),
+              region,
+              "",
+              [],
+            ),
+          ),
+        }),
+      ),
+  });
+  const result = submittedResult ?? opening.data;
   useEffect(() => {
     if (pathKey !== location.pathname) {
       activeRequest.current?.abort();
@@ -460,6 +482,7 @@ export default function App() {
       if (activeRequest.current !== controller || controller.signal.aborted)
         return;
       setCancelled(false);
+      setFiltersOpen(false);
       setResult(data);
       setResultRequest(body);
       setSnapshotQuery(body.query);
@@ -499,6 +522,7 @@ export default function App() {
     recommend.mutate({ body, controller });
   }
   function cancelRecommendation() {
+    void queryClient.cancelQueries({ queryKey: ["opening-selection"] });
     activeRequest.current?.abort();
     activeRequest.current = null;
     inFlight.current = false;
@@ -638,8 +662,11 @@ export default function App() {
     else setMessage("最多对比 3 部影片，请先移除一部。");
   }
   function editConditions() {
-    composerRef.current?.focus({ preventScroll: true });
-    composerRef.current?.scrollIntoView({ block: "start" });
+    setFiltersOpen(true);
+    requestAnimationFrame(() => {
+      composerRef.current?.focus({ preventScroll: true });
+      composerRef.current?.scrollIntoView({ block: "start" });
+    });
   }
   const selectedConditions = [
     ...preferences.moods.map((label) => ({
@@ -885,45 +912,16 @@ export default function App() {
             path="/"
             element={
               <>
-                <section className="intro">
-                  <img
-                    className="intro-image"
-                    src="/images/coastal-train.webp"
-                    alt="暖色车厢里，海岸风景从宽大的车窗外缓缓展开"
-                    width={2200}
-                    height={1237}
-                    fetchPriority="high"
-                  />
-                  <div className="intro-copy">
-                    <p className="intro-note">TONIGHT / 私人选片室</p>
-                    <h1>今晚，想看点什么？</h1>
-                    <p className="intro-description">
-                      选一份心情，赴一场电影。
-                      <br />
-                      不必先有答案，今晚的故事从这里开始。
-                    </p>
-                    <button
-                      className="hero-action"
-                      onClick={() => {
-                        setMode("discover");
-                        requestAnimationFrame(editConditions);
-                      }}
-                    >
-                      开始今晚的选片 <ArrowRight size={20} aria-hidden="true" />
-                    </button>
-                  </div>
-                  <div className="hero-caption">
-                    <span>让生活慢下来，让故事开始。</span>
-                    <a
-                      href="https://unsplash.com/photos/JCqY2Ji5gj4"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      氛围摄影 · Shawn Rain / Unsplash{" "}
-                      <ExternalLink size={12} aria-hidden="true" />
-                    </a>
-                  </div>
-                </section>
+                <DiscoveryHero
+                  movies={result?.candidates.map((item) => item.movie) ?? []}
+                  loading={opening.isFetching || recommend.isPending}
+                  renderPoster={(movie) => <Poster movie={movie} />}
+                  onExplore={() => {
+                    resultsRef.current?.scrollIntoView({ block: "start" });
+                    resultsRef.current?.focus({ preventScroll: true });
+                  }}
+                  onCustomize={editConditions}
+                />
                 <div className="workspace">
                   <aside className="inspiration">
                     <div className="aside-heading">
@@ -968,385 +966,398 @@ export default function App() {
                       </p>
                     </div>
                   </aside>
-                  <section
-                    className="composer"
-                    aria-labelledby="composer-title"
+                  <details
+                    className="filter-workbench"
+                    open={filtersOpen}
+                    onToggle={(event) =>
+                      setFiltersOpen(event.currentTarget.open)
+                    }
                   >
-                    <div className="composer-heading">
-                      <h2 id="composer-title" ref={composerRef} tabIndex={-1}>
-                        没想法，也能开始
-                      </h2>
-                      <p>不用打字。随意点几项，或直接看看。</p>
-                    </div>
-                    <Tabs.Root
-                      value={mode}
-                      onValueChange={(v) => {
-                        invalidateClarification();
-                        setMode(v as Mode);
-                        setFormError(undefined);
-                      }}
+                    <summary>
+                      <span>按自己的想法找</span>
+                      <span>类型、时长、片名与更多条件</span>
+                      <ChevronRight size={20} aria-hidden="true" />
+                    </summary>
+                    <section
+                      className="composer"
+                      aria-labelledby="composer-title"
                     >
-                      <Tabs.List className="mode-tabs" aria-label="选片方式">
-                        <Tabs.Trigger value="discover">
-                          <Sparkles size={16} />
-                          不知道看什么
-                        </Tabs.Trigger>
-                        <Tabs.Trigger value="watchlist">
-                          <Bookmark size={16} />
-                          从片单中选
-                        </Tabs.Trigger>
-                        <Tabs.Trigger value="known_movie">
-                          <Search size={16} />
-                          已知道片名
-                        </Tabs.Trigger>
-                      </Tabs.List>
-                      <Tabs.Content value={mode} className="mode-panel">
-                        <form
-                          onSubmit={submit}
-                          onChangeCapture={invalidateClarification}
-                          onClickCapture={(event) => {
-                            if (
-                              (event.target as HTMLElement).closest(
-                                'button:not([type="submit"])',
+                      <div className="composer-heading">
+                        <h2 id="composer-title" ref={composerRef} tabIndex={-1}>
+                          精细选片
+                        </h2>
+                        <p>只调整在意的条件，其余交给我们。</p>
+                      </div>
+                      <Tabs.Root
+                        value={mode}
+                        onValueChange={(v) => {
+                          invalidateClarification();
+                          setMode(v as Mode);
+                          setFormError(undefined);
+                        }}
+                      >
+                        <Tabs.List className="mode-tabs" aria-label="选片方式">
+                          <Tabs.Trigger value="discover">
+                            <Sparkles size={16} />
+                            不知道看什么
+                          </Tabs.Trigger>
+                          <Tabs.Trigger value="watchlist">
+                            <Bookmark size={16} />
+                            从片单中选
+                          </Tabs.Trigger>
+                          <Tabs.Trigger value="known_movie">
+                            <Search size={16} />
+                            已知道片名
+                          </Tabs.Trigger>
+                        </Tabs.List>
+                        <Tabs.Content value={mode} className="mode-panel">
+                          <form
+                            onSubmit={submit}
+                            onChangeCapture={invalidateClarification}
+                            onClickCapture={(event) => {
+                              if (
+                                (event.target as HTMLElement).closest(
+                                  'button:not([type="submit"])',
+                                )
                               )
-                            )
-                              invalidateClarification();
-                          }}
-                        >
-                          {mode === "discover" && (
-                            <>
-                              <div className="discovery-start">
-                                <Button
-                                  className="primary"
-                                  ref={discoverRef}
-                                  onClick={() =>
-                                    submit(undefined, {
-                                      preferences: emptyPreferences,
-                                      runtime: "",
-                                    })
-                                  }
-                                  disabled={recommend.isPending}
-                                >
-                                  <Sparkles size={18} aria-hidden="true" />
-                                  什么都行，直接看看
-                                  <ArrowRight size={17} aria-hidden="true" />
-                                </Button>
-                                <p>不用打字，先看 3 部真实电影</p>
-                              </div>
-                              <div className="preference-heading">
-                                <strong>给今晚一点方向</strong>
-                                <button
-                                  type="button"
-                                  className="reset-preferences"
-                                  onClick={() => {
-                                    setPreferences(emptyPreferences);
-                                    setRuntime("");
-                                    setEra("any");
-                                    setSortBy("balanced");
-                                    setDrafts((current) => ({
-                                      ...current,
-                                      discover: "",
-                                    }));
-                                  }}
-                                >
-                                  清空选择
-                                </button>
-                              </div>
-                              <div className="discovery-preferences">
-                                <ChoiceGroup
-                                  label="想要什么感觉？"
-                                  anyLabel="不挑心情"
-                                  multiple
-                                  options={[
-                                    "轻松解压",
-                                    "温暖治愈",
-                                    "烧脑过瘾",
-                                    "浪漫心动",
-                                    "惊奇冒险",
-                                    "感动一下",
-                                  ]}
-                                  selected={preferences.moods}
-                                  onChange={(moods) =>
-                                    setPreferences((current) => ({
-                                      ...current,
-                                      moods,
-                                    }))
-                                  }
-                                />
-                                <ChoiceGroup
-                                  label="想看哪种故事？"
-                                  multiple
-                                  options={[
-                                    "喜剧",
-                                    "科幻与奇幻",
-                                    "惊悚",
-                                    "动作",
-                                    "爱情",
-                                    "动画",
-                                    "剧情",
-                                    "家庭",
-                                    "纪录片",
-                                    "恐怖",
-                                  ]}
-                                  selected={preferences.genres}
-                                  onChange={(genres) =>
-                                    setPreferences((current) => ({
-                                      ...current,
-                                      genres,
-                                    }))
-                                  }
-                                />
-                                <ChoiceGroup
-                                  label="今晚有多少时间？"
-                                  options={[
-                                    "90 分钟内",
-                                    "120 分钟内",
-                                    "150 分钟内",
-                                    ...(runtime &&
-                                    !["90", "120", "150"].includes(runtime)
-                                      ? [`${runtime} 分钟内`]
-                                      : []),
-                                  ]}
-                                  selected={
-                                    runtime ? [`${runtime} 分钟内`] : []
-                                  }
-                                  onChange={(values) =>
-                                    setRuntime(values[0]?.split(" ")[0] ?? "")
-                                  }
-                                />
-                                <ChoiceGroup
-                                  label="和谁一起看？（家人会筛选家庭/动画）"
-                                  anyLabel="都可以"
-                                  options={[
-                                    "一个人",
-                                    "两个人",
-                                    "和朋友",
-                                    "和家人",
-                                  ]}
-                                  selected={
-                                    preferences.company
-                                      ? [preferences.company]
-                                      : []
-                                  }
-                                  onChange={(values) =>
-                                    setPreferences((current) => ({
-                                      ...current,
-                                      company: values[0] ?? "",
-                                    }))
-                                  }
-                                />
-                                <ChoiceGroup
-                                  label="想看哪个年代？"
-                                  anyLabel="不限年代"
-                                  options={[
-                                    "2020 年至今",
-                                    "2000—2019 年",
-                                    "2000 年以前",
-                                  ]}
-                                  selected={
-                                    era === "any"
-                                      ? []
-                                      : [
-                                          {
-                                            recent: "2020 年至今",
-                                            "2000s": "2000—2019 年",
-                                            classic: "2000 年以前",
-                                          }[era],
-                                        ]
-                                  }
-                                  onChange={(values) =>
-                                    setEra(
-                                      values[0] === "2020 年至今"
-                                        ? "recent"
-                                        : values[0] === "2000—2019 年"
-                                          ? "2000s"
-                                          : values[0] === "2000 年以前"
-                                            ? "classic"
-                                            : "any",
-                                    )
-                                  }
-                                />
-                                <ChoiceGroup
-                                  label="怎么安排候选？"
-                                  anyLabel="均衡探索"
-                                  options={["榜单顺序"]}
-                                  selected={
-                                    sortBy === "popular" ? ["榜单顺序"] : []
-                                  }
-                                  onChange={(values) =>
-                                    setSortBy(
-                                      values.length ? "popular" : "balanced",
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div
-                                className="selection-summary"
-                                aria-label="已选条件"
-                                role="status"
-                              >
-                                {selectedConditions.length ? (
-                                  <>
-                                    <span className="selection-caption">
-                                      已选 {selectedConditions.length} 项
-                                    </span>
-                                    {selectedConditions.map((condition) => (
-                                      <button
-                                        key={condition.label}
-                                        type="button"
-                                        onClick={condition.remove}
-                                        aria-label={`移除条件 ${condition.label}`}
-                                      >
-                                        {condition.label}
-                                        <X size={13} aria-hidden="true" />
-                                      </button>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <span>不设条件也可以，直接看看就好。</span>
-                                )}
-                              </div>
-                              <p className="mock-limit">
-                                <Info size={15} aria-hidden="true" />
-                                类型、年代和时长严格筛选。心情结合类型与简介词法线索推断；均衡探索会分散类型和导演，不代表口碑评分。
-                              </p>
-                            </>
-                          )}
-                          <div className="field natural-input">
-                            <label htmlFor="mood">
-                              {mode === "known_movie"
-                                ? "关于这部电影，你在意什么？"
-                                : "说说今晚想看什么（可选）"}
-                            </label>
-                            <textarea
-                              id="mood"
-                              name="query"
-                              autoComplete="off"
-                              ref={textareaRef}
-                              value={drafts[mode]}
-                              onChange={(e) =>
-                                setDrafts((current) => ({
-                                  ...current,
-                                  [mode]: e.target.value,
-                                }))
-                              }
-                              placeholder="例如：想看轻松的喜剧，两个小时以内，不要恐怖片。"
-                              maxLength={mode === "discover" ? 1500 : 2000}
-                              rows={2}
-                              aria-describedby="mood-help"
-                            />
-                            <div className="input-help" id="mood-help">
-                              <span>
-                                不填也能选。支持常见类型、心情、时长和排除；无法执行的要求会先请你确认。
-                              </span>
-                              <span>
-                                {drafts[mode].length}/
-                                {mode === "discover" ? 1500 : 2000}
-                              </span>
-                            </div>
-                          </div>
-                          {mode === "known_movie" && (
-                            <>
-                              <MovieLookup
-                                onChoose={(movie) => {
-                                  setSelected(movie);
-                                  setMessage(
-                                    `已确认 ${movie.title}（${movie.year}）`,
-                                  );
-                                }}
-                                chooseLabel="确认这部"
-                              />
-                              {selected && (
-                                <div className="confirmed">
-                                  <Check size={16} />
-                                  已确认：{selected.title}（{selected.year}）
-                                  <Button
-                                    className="text-button"
-                                    onClick={() => setSelected(undefined)}
-                                  >
-                                    取消确认
-                                  </Button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                          {mode === "watchlist" && (
-                            <p className="mode-hint">
-                              {saved.length
-                                ? `将从本次片单的 ${saved.length} 部影片中选择。`
-                                : "本次片单还是空的。先查找影片并加入，再回到这里选片。"}{" "}
-                              <Link to="/watchlist">管理本次片单</Link>
-                            </p>
-                          )}
-                          <details
-                            className="optional-preferences"
-                            open={mode !== "discover" || detailsOpen}
-                            onToggle={(event) => {
-                              if (mode === "discover")
-                                setDetailsOpen(event.currentTarget.open);
+                                invalidateClarification();
                             }}
                           >
-                            <summary>精确时长与观看地区（可选）</summary>
-                            <div className="constraints">
-                              <div className="field">
-                                <label htmlFor="runtime">
-                                  最多看多久 <span>（可选）</span>
-                                </label>
-                                <div className="number-input">
-                                  <input
-                                    id="runtime"
-                                    name="max_runtime_minutes"
-                                    autoComplete="off"
-                                    type="number"
-                                    min="1"
-                                    max="600"
-                                    step="1"
-                                    inputMode="numeric"
-                                    value={runtime}
-                                    onChange={(e) => setRuntime(e.target.value)}
-                                    placeholder="不限"
-                                  />
-                                  <span>分钟</span>
+                            {mode === "discover" && (
+                              <>
+                                <div className="discovery-start">
+                                  <Button
+                                    className="primary"
+                                    ref={discoverRef}
+                                    onClick={() =>
+                                      submit(undefined, {
+                                        preferences: emptyPreferences,
+                                        runtime: "",
+                                      })
+                                    }
+                                    disabled={recommend.isPending}
+                                  >
+                                    <Sparkles size={18} aria-hidden="true" />
+                                    什么都行，直接看看
+                                    <ArrowRight size={17} aria-hidden="true" />
+                                  </Button>
+                                  <p>不用打字，先看 3 部真实电影</p>
                                 </div>
-                              </div>
-                              <div className="field">
-                                <label htmlFor="region">观看地区</label>
-                                <select
-                                  id="region"
-                                  name="region"
-                                  autoComplete="off"
-                                  value={region}
-                                  onChange={(e) => setRegion(e.target.value)}
+                                <div className="preference-heading">
+                                  <strong>给今晚一点方向</strong>
+                                  <button
+                                    type="button"
+                                    className="reset-preferences"
+                                    onClick={() => {
+                                      setPreferences(emptyPreferences);
+                                      setRuntime("");
+                                      setEra("any");
+                                      setSortBy("balanced");
+                                      setDrafts((current) => ({
+                                        ...current,
+                                        discover: "",
+                                      }));
+                                    }}
+                                  >
+                                    清空选择
+                                  </button>
+                                </div>
+                                <div className="discovery-preferences">
+                                  <ChoiceGroup
+                                    label="想要什么感觉？"
+                                    anyLabel="不挑心情"
+                                    multiple
+                                    options={[
+                                      "轻松解压",
+                                      "温暖治愈",
+                                      "烧脑过瘾",
+                                      "浪漫心动",
+                                      "惊奇冒险",
+                                      "感动一下",
+                                    ]}
+                                    selected={preferences.moods}
+                                    onChange={(moods) =>
+                                      setPreferences((current) => ({
+                                        ...current,
+                                        moods,
+                                      }))
+                                    }
+                                  />
+                                  <ChoiceGroup
+                                    label="想看哪种故事？"
+                                    multiple
+                                    options={[
+                                      "喜剧",
+                                      "科幻与奇幻",
+                                      "惊悚",
+                                      "动作",
+                                      "爱情",
+                                      "动画",
+                                      "剧情",
+                                      "家庭",
+                                      "纪录片",
+                                      "恐怖",
+                                    ]}
+                                    selected={preferences.genres}
+                                    onChange={(genres) =>
+                                      setPreferences((current) => ({
+                                        ...current,
+                                        genres,
+                                      }))
+                                    }
+                                  />
+                                  <ChoiceGroup
+                                    label="今晚有多少时间？"
+                                    options={[
+                                      "90 分钟内",
+                                      "120 分钟内",
+                                      "150 分钟内",
+                                      ...(runtime &&
+                                      !["90", "120", "150"].includes(runtime)
+                                        ? [`${runtime} 分钟内`]
+                                        : []),
+                                    ]}
+                                    selected={
+                                      runtime ? [`${runtime} 分钟内`] : []
+                                    }
+                                    onChange={(values) =>
+                                      setRuntime(values[0]?.split(" ")[0] ?? "")
+                                    }
+                                  />
+                                  <ChoiceGroup
+                                    label="和谁一起看？（家人会筛选家庭/动画）"
+                                    anyLabel="都可以"
+                                    options={[
+                                      "一个人",
+                                      "两个人",
+                                      "和朋友",
+                                      "和家人",
+                                    ]}
+                                    selected={
+                                      preferences.company
+                                        ? [preferences.company]
+                                        : []
+                                    }
+                                    onChange={(values) =>
+                                      setPreferences((current) => ({
+                                        ...current,
+                                        company: values[0] ?? "",
+                                      }))
+                                    }
+                                  />
+                                  <ChoiceGroup
+                                    label="想看哪个年代？"
+                                    anyLabel="不限年代"
+                                    options={[
+                                      "2020 年至今",
+                                      "2000—2019 年",
+                                      "2000 年以前",
+                                    ]}
+                                    selected={
+                                      era === "any"
+                                        ? []
+                                        : [
+                                            {
+                                              recent: "2020 年至今",
+                                              "2000s": "2000—2019 年",
+                                              classic: "2000 年以前",
+                                            }[era],
+                                          ]
+                                    }
+                                    onChange={(values) =>
+                                      setEra(
+                                        values[0] === "2020 年至今"
+                                          ? "recent"
+                                          : values[0] === "2000—2019 年"
+                                            ? "2000s"
+                                            : values[0] === "2000 年以前"
+                                              ? "classic"
+                                              : "any",
+                                      )
+                                    }
+                                  />
+                                  <ChoiceGroup
+                                    label="怎么安排候选？"
+                                    anyLabel="均衡探索"
+                                    options={["榜单顺序"]}
+                                    selected={
+                                      sortBy === "popular" ? ["榜单顺序"] : []
+                                    }
+                                    onChange={(values) =>
+                                      setSortBy(
+                                        values.length ? "popular" : "balanced",
+                                      )
+                                    }
+                                  />
+                                </div>
+                                <div
+                                  className="selection-summary"
+                                  aria-label="已选条件"
+                                  role="status"
                                 >
-                                  <option value="CN">中国大陆</option>
-                                  <option value="HK">中国香港</option>
-                                  <option value="TW">中国台湾</option>
-                                  <option value="JP">日本</option>
-                                  <option value="US">美国</option>
-                                </select>
+                                  {selectedConditions.length ? (
+                                    <>
+                                      <span className="selection-caption">
+                                        已选 {selectedConditions.length} 项
+                                      </span>
+                                      {selectedConditions.map((condition) => (
+                                        <button
+                                          key={condition.label}
+                                          type="button"
+                                          onClick={condition.remove}
+                                          aria-label={`移除条件 ${condition.label}`}
+                                        >
+                                          {condition.label}
+                                          <X size={13} aria-hidden="true" />
+                                        </button>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <span>不设条件也可以，直接看看就好。</span>
+                                  )}
+                                </div>
+                                <p className="mock-limit">
+                                  <Info size={15} aria-hidden="true" />
+                                  类型、年代和时长严格筛选。心情结合类型与简介词法线索推断；均衡探索会分散类型和导演，不代表口碑评分。
+                                </p>
+                              </>
+                            )}
+                            <div className="field natural-input">
+                              <label htmlFor="mood">
+                                {mode === "known_movie"
+                                  ? "关于这部电影，你在意什么？"
+                                  : "说说今晚想看什么（可选）"}
+                              </label>
+                              <textarea
+                                id="mood"
+                                name="query"
+                                autoComplete="off"
+                                ref={textareaRef}
+                                value={drafts[mode]}
+                                onChange={(e) =>
+                                  setDrafts((current) => ({
+                                    ...current,
+                                    [mode]: e.target.value,
+                                  }))
+                                }
+                                placeholder="例如：想看轻松的喜剧，两个小时以内，不要恐怖片。"
+                                maxLength={mode === "discover" ? 1500 : 2000}
+                                rows={2}
+                                aria-describedby="mood-help"
+                              />
+                              <div className="input-help" id="mood-help">
+                                <span>
+                                  不填也能选。支持常见类型、心情、时长和排除；无法执行的要求会先请你确认。
+                                </span>
+                                <span>
+                                  {drafts[mode].length}/
+                                  {mode === "discover" ? 1500 : 2000}
+                                </span>
                               </div>
                             </div>
-                          </details>
-                          <div className="composer-bottom">
-                            <p>
-                              <ShieldCheck size={16} aria-hidden="true" />
-                              可跳过所有选项 · 不写入长期记忆
-                            </p>
-                            <Button
-                              className="primary"
-                              type="submit"
-                              disabled={recommend.isPending}
+                            {mode === "known_movie" && (
+                              <>
+                                <MovieLookup
+                                  onChoose={(movie) => {
+                                    setSelected(movie);
+                                    setMessage(
+                                      `已确认 ${movie.title}（${movie.year}）`,
+                                    );
+                                  }}
+                                  chooseLabel="确认这部"
+                                />
+                                {selected && (
+                                  <div className="confirmed">
+                                    <Check size={16} />
+                                    已确认：{selected.title}（{selected.year}）
+                                    <Button
+                                      className="text-button"
+                                      onClick={() => setSelected(undefined)}
+                                    >
+                                      取消确认
+                                    </Button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {mode === "watchlist" && (
+                              <p className="mode-hint">
+                                {saved.length
+                                  ? `将从本次片单的 ${saved.length} 部影片中选择。`
+                                  : "本次片单还是空的。先查找影片并加入，再回到这里选片。"}{" "}
+                                <Link to="/watchlist">管理本次片单</Link>
+                              </p>
+                            )}
+                            <details
+                              className="optional-preferences"
+                              open={mode !== "discover" || detailsOpen}
+                              onToggle={(event) => {
+                                if (mode === "discover")
+                                  setDetailsOpen(event.currentTarget.open);
+                              }}
                             >
-                              {recommend.isPending
-                                ? "正在查找电影…"
-                                : "看看候选电影"}
-                              {!recommend.isPending && <ArrowRight size={17} />}
-                            </Button>
-                          </div>
-                        </form>
-                      </Tabs.Content>
-                    </Tabs.Root>
-                  </section>
+                              <summary>精确时长与观看地区（可选）</summary>
+                              <div className="constraints">
+                                <div className="field">
+                                  <label htmlFor="runtime">
+                                    最多看多久 <span>（可选）</span>
+                                  </label>
+                                  <div className="number-input">
+                                    <input
+                                      id="runtime"
+                                      name="max_runtime_minutes"
+                                      autoComplete="off"
+                                      type="number"
+                                      min="1"
+                                      max="600"
+                                      step="1"
+                                      inputMode="numeric"
+                                      value={runtime}
+                                      onChange={(e) => setRuntime(e.target.value)}
+                                      placeholder="不限"
+                                    />
+                                    <span>分钟</span>
+                                  </div>
+                                </div>
+                                <div className="field">
+                                  <label htmlFor="region">观看地区</label>
+                                  <select
+                                    id="region"
+                                    name="region"
+                                    autoComplete="off"
+                                    value={region}
+                                    onChange={(e) => setRegion(e.target.value)}
+                                  >
+                                    <option value="CN">中国大陆</option>
+                                    <option value="HK">中国香港</option>
+                                    <option value="TW">中国台湾</option>
+                                    <option value="JP">日本</option>
+                                    <option value="US">美国</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </details>
+                            <div className="composer-bottom">
+                              <p>
+                                <ShieldCheck size={16} aria-hidden="true" />
+                                可跳过所有选项 · 不写入长期记忆
+                              </p>
+                              <Button
+                                className="primary"
+                                type="submit"
+                                disabled={recommend.isPending}
+                              >
+                                {recommend.isPending
+                                  ? "正在查找电影…"
+                                  : "看看候选电影"}
+                                {!recommend.isPending && <ArrowRight size={17} />}
+                              </Button>
+                            </div>
+                          </form>
+                        </Tabs.Content>
+                      </Tabs.Root>
+                    </section>
+                  </details>
                 </div>
                 <section
                   className="results"
@@ -1369,9 +1380,9 @@ export default function App() {
                         : "不必填写，点一下就能开始"}
                     </span>
                   </div>
-                  {(formError || recommend.error) && (
+                  {(formError || recommend.error || (!result && opening.error)) && (
                     <ErrorNotice
-                      error={formError ?? recommend.error!}
+                      error={formError ?? recommend.error ?? opening.error!}
                       retry={
                         recommend.error instanceof ApiError &&
                         recommend.error.retryable
@@ -1383,7 +1394,7 @@ export default function App() {
                       }
                     />
                   )}
-                  {recommend.isPending && (
+                  {(recommend.isPending || (!result && opening.isFetching)) && (
                     <div className="loading" role="status">
                       <div className="skeleton" />
                       <p>正在从真实片库匹配电影…</p>
@@ -1409,7 +1420,7 @@ export default function App() {
                         ) : (
                           <Badge mode={result.data_mode} />
                         )}
-                        <span>已提交偏好：{snapshotQuery}</span>
+                        <span>已提交偏好：{snapshotQuery || "随意探索 · 未设筛选条件"}</span>
                         <small>
                           {result.memory_used
                             ? "服务报告使用了记忆"
