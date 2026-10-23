@@ -37,9 +37,7 @@ test("P03 real evidence drawer: provenance, focus, close and OS theme", async ({
 }, info) => {
   await page.goto("/");
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const data = await submit(page);
   expect(["live", "cached"]).toContain(data.data_mode);
   expect(data.candidates.length).toBe(3);
@@ -125,7 +123,10 @@ for (const count of [0, 1, 2, 3])
       r.fulfill({ json: data }),
     );
     await page.goto("/");
-    await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+    await expect(page.locator(".results")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
     await page
       .getByRole("button", { name: "我有一点想法", exact: true })
       .click();
@@ -209,9 +210,7 @@ test("P03 OFFLINE multi-platform provenance, long prose, unsafe links and spoile
   await page.route("**/api/recommendations", (r) => r.fulfill({ json: data }));
   await page.goto("/");
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await submit(page);
   const scores = page.locator(".candidate-grid").getByTestId("source-rating");
   await expect(scores).toHaveCount(2);
@@ -270,9 +269,7 @@ test("P04 OFFLINE comparison keeps selected evidence through reroll and undo", a
   );
   await page.goto("/");
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const checks = page.locator(".candidate-grid").getByRole("checkbox");
   await checks.nth(0).check();
   await checks.nth(1).check();
@@ -317,9 +314,7 @@ test("P03 OFFLINE invalid rating provenance is rejected without replacing earlie
   );
   await page.goto("/");
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await submit(page, "换一组真实电影");
   await expect(page.getByRole("alert")).toContainText("缺少可核对的安全来源");
   await expect(page.locator(".candidate-grid > article")).toHaveCount(3);
