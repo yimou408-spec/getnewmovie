@@ -32,7 +32,8 @@ MOODS = {
 }
 NUMBER = r"[0-9零〇一二两三四五六七八九十百半个.]+"
 GENRE_PATTERN = "|".join(f"(?:{p})" for p in GENRES.values())
-NEGATIVE = rf"(?:不要|不想看|不看|别看|排除|不喜欢|without|no)\s*(?:任何)?(?:{GENRE_PATTERN})(?:片|电影)?(?:\s*[、和或与及]\s*(?:{GENRE_PATTERN})(?:片|电影)?)*"
+NEGATION = r"(?:不要(?:看)?|不想(?:看)?|不喜欢(?:看)?|别看|不看|排除|不|\b(?:without|not|no)\b)"
+NEGATIVE = rf"{NEGATION}\s*(?:任何)?(?:{GENRE_PATTERN})(?:片|电影)?(?:\s*[、和或与及]\s*(?:{GENRE_PATTERN})(?:片|电影)?)*"
 
 
 def number(text):
@@ -109,14 +110,23 @@ def parse_text(query):
             "classic": "2000年(?:以前|之前)",
         },
     }.items():
+        values = []
         for label, pattern in patterns.items():
-            remove(rf"(?:不要|不想|不喜欢|不|without|not)\s*(?:{pattern})", lambda m: unhandled.append(m[0]))
-            remove(pattern, lambda m, label=label, field=field: parsed.update({field: label}))
+            remove(rf"{NEGATION}\s*(?:{pattern})", lambda m: unhandled.append(m[0]))
+            remove(pattern, lambda m, label=label: values.append(label))
+        values = list(dict.fromkeys(values))
+        if len(values) == 1:
+            parsed[field] = values[0]
+        elif values:
+            context = "同行" if field == "company" else "年代"
+            names = {"recent": "2020 年至今", "2000s": "2000—2019 年", "classic": "2000 年以前"}
+            choices = " / ".join(names.get(value, value) for value in values)
+            unhandled.append(f"出现多个不同{context}：{choices}；请保留一个明确条件")
     for label, pattern in GENRES.items():
         remove(pattern, lambda m, label=label: add("genres", label))
     for label, pattern in MOODS.items():
         # Negated moods are not converted into the same positive preference.
-        remove(rf"(?:不要|不想|不喜欢|不)\s*(?:{pattern})", lambda m: unhandled.append(m[0]))
+        remove(rf"{NEGATION}\s*(?:{pattern})", lambda m: unhandled.append(m[0]))
         remove(pattern, lambda m, label=label: add("moods", label))
     if set(parsed.get("genres", [])) & set(parsed.get("exclude_genres", [])):
         unhandled.append("文字同时要求并排除同一类型，请重新描述")
