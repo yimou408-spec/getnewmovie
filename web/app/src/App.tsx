@@ -717,34 +717,33 @@ export default function App() {
   function card(movie: Movie, candidate?: Candidate, index = 0) {
     return (
       <article
-        className={`movie-card ${candidate ? "recommendation-card" : ""}`}
+        className={`movie-card film-tile ${candidate ? "recommendation-card" : ""}`}
         key={movie.movie_id}
       >
-        <div className="movie-cover">
-          <Poster
-            key={movie.poster_url ?? movie.movie_id}
-            movie={movie}
-            small={!candidate}
-          />
-          {candidate && (
-            <span className="pick-number" aria-hidden="true">
-              {String(index + 1).padStart(2, "0")}
-              <span>今晚候选</span>
-            </span>
-          )}
-        </div>
-        <div className="movie-body">
-          <div className="movie-heading">
-            <div>
-              <Badge
-                mode={
-                  movie.movie_id.startsWith("syn:")
-                    ? "synthetic"
-                    : candidate
-                      ? result!.data_mode
-                      : "unknown"
-                }
-              />
+        <div className="movie-summary">
+          <div className="movie-cover">
+            <Poster
+              key={movie.poster_url ?? movie.movie_id}
+              movie={movie}
+              small={!candidate}
+            />
+            {candidate && (
+              <span className="pick-number" aria-hidden="true">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+            )}
+          </div>
+          <div className="movie-identity">
+            <Badge
+              mode={
+                movie.movie_id.startsWith("syn:")
+                  ? "synthetic"
+                  : candidate
+                    ? result!.data_mode
+                    : "unknown"
+              }
+            />
+            <div className="movie-heading">
               <h3>
                 <Link to={`/film/${encodeURIComponent(movie.movie_id)}`}>
                   {movie.title}
@@ -752,15 +751,13 @@ export default function App() {
                 </Link>
               </h3>
             </div>
+            <MovieFacts movie={movie} />
+            {movie.director && (
+              <p className="muted movie-director">导演：{movie.director}</p>
+            )}
           </div>
-          <MovieFacts movie={movie} />
-          {movie.director && <p className="muted">导演：{movie.director}</p>}
-          {movie.content_advisory && (
-            <p className="muted">
-              美国内容分级：{movie.content_advisory} · 不代表本地适龄结论
-            </p>
-          )}
-          <StoreBadge movie={movie} />
+        </div>
+        <div className="movie-body">
           {candidate ? (
             <>
               <div className="reason">
@@ -773,19 +770,28 @@ export default function App() {
                   {reasonLabels[candidate.reason.kind]} · 不等同于观众口碑
                 </small>
               </div>
-              <div className="caveats">
-                {(candidate.caveats ?? []).map((c, i) => (
-                  <p key={i}>
-                    <Info size={15} aria-hidden="true" />
-                    {c}
-                  </p>
-                ))}
-                {(candidate.uncertain_conditions ?? []).map((c, i) => (
-                  <p key={i}>待确认：{c}</p>
-                ))}
-              </div>
               <Ratings movie={movie} evidence={result?.evidence} />
               <Availability candidate={candidate} />
+              <details className="movie-context">
+                <summary>查看资料与观看提醒</summary>
+                <StoreBadge movie={movie} />
+                {movie.content_advisory && (
+                  <p className="muted">
+                    美国内容分级：{movie.content_advisory} · 不代表本地适龄结论
+                  </p>
+                )}
+                <div className="caveats">
+                  {(candidate.caveats ?? []).map((c, i) => (
+                    <p key={i}>
+                      <Info size={15} aria-hidden="true" />
+                      {c}
+                    </p>
+                  ))}
+                  {(candidate.uncertain_conditions ?? []).map((c, i) => (
+                    <p key={i}>待确认：{c}</p>
+                  ))}
+                </div>
+              </details>
             </>
           ) : (
             <p className="muted">
@@ -890,13 +896,13 @@ export default function App() {
                   />
                   <div className="intro-copy">
                     <p className="intro-note">
-                      私人选片室 · 给自己留一点电影时间
+                      TONIGHT / 私人选片室
                     </p>
                     <h1>今晚，想看点什么？</h1>
                     <p className="intro-description">
-                      暂停日常，走进另一个故事。
+                      选一份心情，赴一场电影。
                       <br />
-                      从此刻的心情出发，找到今晚想看的那一部。
+                      不必先有答案，今晚的故事从这里开始。
                     </p>
                     <button
                       className="hero-action"
@@ -924,9 +930,9 @@ export default function App() {
                   <aside className="inspiration">
                     <div className="aside-heading">
                       <Sparkles size={19} aria-hidden="true" />
-                      <h2>懒得选？点一个场景</h2>
+                      <h2>从一个场景开始</h2>
                     </div>
-                    <p>点一下，按这个场景找真实电影。</p>
+                    <p>选好氛围，剩下的交给我们。</p>
                     <div className="idea-list">
                       {ideas.map((idea) => (
                         <button
@@ -1030,7 +1036,7 @@ export default function App() {
                                 <p>不用打字，先看 3 部真实电影</p>
                               </div>
                               <div className="preference-heading">
-                                <strong>点几下，给今晚一点方向</strong>
+                                <strong>给今晚一点方向</strong>
                                 <button
                                   type="button"
                                   className="reset-preferences"
