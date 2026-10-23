@@ -970,7 +970,9 @@ export default function App() {
                   <details
                     className="filter-workbench"
                     open={filtersOpen}
-                    onToggle={(event) => setFiltersOpen(event.currentTarget.open)}
+                    onToggle={(event) =>
+                      setFiltersOpen(event.currentTarget.open)
+                    }
                   >
                     <summary>
                       <span>按自己的想法找</span>
@@ -1312,7 +1314,9 @@ export default function App() {
                                       step="1"
                                       inputMode="numeric"
                                       value={runtime}
-                                      onChange={(e) => setRuntime(e.target.value)}
+                                      onChange={(e) =>
+                                        setRuntime(e.target.value)
+                                      }
                                       placeholder="不限"
                                     />
                                     <span>分钟</span>
@@ -1349,7 +1353,9 @@ export default function App() {
                                 {recommend.isPending
                                   ? "正在查找电影…"
                                   : "看看候选电影"}
-                                {!recommend.isPending && <ArrowRight size={17} />}
+                                {!recommend.isPending && (
+                                  <ArrowRight size={17} />
+                                )}
                               </Button>
                             </div>
                           </form>
