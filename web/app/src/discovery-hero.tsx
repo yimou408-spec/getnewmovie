@@ -5,12 +5,14 @@ import type { Movie } from "./domain";
 export function DiscoveryHero({
   movies,
   loading,
+  synthetic,
   renderPoster,
   onExplore,
   onCustomize,
 }: {
   movies: Movie[];
   loading: boolean;
+  synthetic: boolean;
   renderPoster: (movie: Movie) => ReactNode;
   onExplore: () => void;
   onCustomize: () => void;
@@ -65,15 +67,15 @@ export function DiscoveryHero({
               </span>
               <p>{loading ? "好故事，正在路上。" : "等一部电影的时间。"}</p>
               <small>
-                {loading
-                  ? "正在读取真实片库"
-                  : "请在下方重试，或调整选片条件"}
+                {loading ? "正在读取真实片库" : "请在下方重试，或调整选片条件"}
               </small>
             </div>
           )}
         </div>
         <p className="screening-credit">
-          电影资料与海报来自 Apple 美国区 · 来源榜单不代表口碑评分
+          {synthetic
+            ? "离线合成契约样例 · 不代表真实推荐"
+            : "电影资料与海报来自 Apple 美国区 · 来源榜单不代表口碑评分"}
         </p>
       </div>
     </section>
