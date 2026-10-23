@@ -5,6 +5,7 @@ on:
     branches: [feat/pionneerz-p01-20261021]
     paths:
       - .github/workflows/team-preview.yml
+      - scripts/movie_preview.py
 permissions:
   contents: read
 concurrency:
@@ -46,6 +47,11 @@ jobs:
           done
           python -c 'import json; h=json.load(open("preview-evidence/health.json")); assert h["synthetic_fallback"] is False, h'
           curl -fsS http://127.0.0.1:8000/ > preview-evidence/index.html
+          for route in about watchlist preferences film/itunes%3A863161983; do
+            curl -fsS "http://127.0.0.1:8000/$route" | cmp - preview-evidence/index.html
+          done
+          test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/not-a-route)" = 404
+          test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/assets/missing.js)" = 404
           test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/README.md)" = 404
           curl -fL --retry 3 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/movie-cloudflared
           chmod +x /tmp/movie-cloudflared
