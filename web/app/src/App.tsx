@@ -895,9 +895,7 @@ export default function App() {
                     fetchPriority="high"
                   />
                   <div className="intro-copy">
-                    <p className="intro-note">
-                      TONIGHT / 私人选片室
-                    </p>
+                    <p className="intro-note">TONIGHT / 私人选片室</p>
                     <h1>今晚，想看点什么？</h1>
                     <p className="intro-description">
                       选一份心情，赴一场电影。
