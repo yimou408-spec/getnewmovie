@@ -931,7 +931,9 @@
   padding: 12px;
   border-radius: 12px;
   gap: 10px;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 .home-page .idea-list > button > svg {
   display: none;
