@@ -125,10 +125,10 @@ for (const count of [0, 1, 2, 3])
       r.fulfill({ json: data }),
     );
     await page.goto("/");
-  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+    await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+    await page
+      .getByRole("button", { name: "我有一点想法", exact: true })
+      .click();
     await submit(page);
     await expect(page.locator(".candidate-grid > article")).toHaveCount(count);
     await expect(
