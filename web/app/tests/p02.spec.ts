@@ -412,7 +412,9 @@ test("P02 negated watch phrases exclude a genre through the real UI", async ({
       expect(candidate.movie.genres).not.toContain("恐怖");
       expect(candidate.movie.runtime_minutes).toBeLessThanOrEqual(120);
     }
-    await expect(page.locator(".intent-summary")).toContainText("排除类型：恐怖");
+    await expect(page.locator(".intent-summary")).toContainText(
+      "排除类型：恐怖",
+    );
   }
   await accessible(page);
   await page.screenshot({
