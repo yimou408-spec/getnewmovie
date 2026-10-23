@@ -67,9 +67,7 @@ test.beforeEach(async ({ page }) => {
   ).toBe(false);
   await page.goto("/");
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
 });
 test("real catalog, artwork, sources, watchlist and comparison", async ({
   page,
@@ -278,9 +276,7 @@ test("real identity lookup, known film, watchlist and reload boundary", async ({
   ]);
   await page.reload();
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await page.getByRole("link", { name: /本次片单/ }).click();
   await expect(
     page.getByRole("button", { name: "移出本次片单", exact: true }),
@@ -314,13 +310,13 @@ test("failed or invalid source response preserves real results; poster failure i
   await page.route("**/api/artwork/**", (r) => r.abort());
   await page.reload();
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await submit(page);
   for (const poster of await page.locator(".candidate-grid .poster").all())
     await poster.scrollIntoViewIfNeeded();
-  await expect(page.locator(".candidate-grid").getByText("海报加载失败", { exact: true })).toHaveCount(3);
+  await expect(
+    page.locator(".candidate-grid").getByText("海报加载失败", { exact: true }),
+  ).toHaveCount(3);
 });
 test("system theme changes immediately, keyboard focus and narrow layout", async ({
   page,
@@ -343,9 +339,7 @@ test("system theme changes immediately, keyboard focus and narrow layout", async
   await expect(page.getByRole("link", { name: "跳到主要内容" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await submit(page);
   await page.setViewportSize(
     info.project.name.startsWith("mobile")
@@ -372,13 +366,15 @@ test("stalled artwork times out and can be retried without losing the film", asy
   });
   await page.reload();
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
-  await page
-    .getByRole("button", { name: "我有一点想法", exact: true })
-    .click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const data = await submit(page);
-  await expect(page.locator(".candidate-grid").getByText("海报加载中…", { exact: true })).toHaveCount(3);
+  await expect(
+    page.locator(".candidate-grid").getByText("海报加载中…", { exact: true }),
+  ).toHaveCount(3);
   await page.clock.fastForward(12001);
-  await expect(page.locator(".candidate-grid").getByText("海报加载超时", { exact: true })).toHaveCount(3);
+  await expect(
+    page.locator(".candidate-grid").getByText("海报加载超时", { exact: true }),
+  ).toHaveCount(3);
   await expect(
     page.getByRole("heading", {
       name: data.candidates[0].movie.title,
@@ -393,7 +389,9 @@ test("stalled artwork times out and can be retried without losing the film", asy
     .first()
     .click();
   await expect.poll(() => requests).toBeGreaterThan(before);
-  await expect(page.locator(".candidate-grid").getByText("海报加载失败", { exact: true })).toHaveCount(1);
+  await expect(
+    page.locator(".candidate-grid").getByText("海报加载失败", { exact: true }),
+  ).toHaveCount(1);
   await noOverflow(page);
   await accessible(page);
   await page.screenshot({
