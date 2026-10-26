@@ -66,7 +66,10 @@ test.beforeEach(async ({ page }) => {
       .synthetic_fallback,
   ).toBe(false);
   await page.goto("/");
-  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  // A cold real catalog can load until the client's 45-second request timeout.
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false", {
+    timeout: 50000,
+  });
   await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
 });
 test("real catalog, artwork, sources, watchlist and comparison", async ({

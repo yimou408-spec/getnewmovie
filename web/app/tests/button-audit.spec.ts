@@ -505,6 +505,7 @@ test("audit: search, detail, comparison and health retries recover against real 
     page.getByRole("heading", { name: film.title, exact: true }),
   ).toBeVisible();
   await page.getByRole("link", { name: "回选片室", exact: true }).click();
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await recommend(page);
   const checks = page.locator(".candidate-grid").getByRole("checkbox");
   await checks.nth(0).check();
