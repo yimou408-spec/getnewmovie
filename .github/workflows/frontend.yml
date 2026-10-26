@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     defaults:
       run:
@@ -26,12 +26,19 @@ jobs:
           cache-dependency-path: web/app/package-lock.json
       - run: python -m pip install -r ../../requirements-s0.txt
       - run: npm ci
-      - run: npm run format:check
       - run: npm run types:check
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Check formatting and show repair diff
+        if: always()
+        run: |
+          if ! npm run format:check; then
+            npx prettier --write src tests *.ts *.json index.html
+            git diff --no-ext-diff
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
