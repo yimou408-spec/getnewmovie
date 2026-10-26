@@ -367,6 +367,7 @@ export default function App() {
   const [resultRequest, setResultRequest] =
     useState<ReturnType<typeof buildRequest>>();
   const [snapshotQuery, setSnapshotQuery] = useState("");
+  const [followup, setFollowup] = useState("");
   const [cancelled, setCancelled] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
   const sessionId = useRef<string | undefined>(undefined);
@@ -1460,7 +1461,9 @@ export default function App() {
                               : "已识别条件"}
                           </h3>
                           <p className="intent-method">
-                            规则解析 · 心情仅作软偏好
+                            {result.interpretation.method === "llm-v1"
+                              ? "模型理解 · 代码执行筛选 · 心情仅作软偏好"
+                              : "规则解析 · 心情仅作软偏好"}
                           </p>
                           <ul>
                             {(result.interpretation.hard_conditions ?? []).map(
@@ -1608,6 +1611,75 @@ export default function App() {
                           </small>
                         </div>
                       )}
+                      {resultRequest?.mode === "discover" &&
+                        result.interpretation?.method === "llm-v1" &&
+                        result.status !== "needs_clarification" && (
+                          <form
+                            className="selection-summary"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              if (!followup.trim() || recommend.isPending)
+                                return;
+                              const next = buildRequest(
+                                "discover",
+                                followup,
+                                region,
+                                "",
+                                [],
+                              );
+                              next.input_source = "natural_language";
+                              next.constraints = {
+                                company: "",
+                                sort_by: "balanced",
+                                era: "any",
+                                ...next.constraints,
+                                exclude_movie_ids: dismissed,
+                              };
+                              startRecommendation(next);
+                              setFollowup("");
+                            }}
+                          >
+                            <label htmlFor="followup">继续调整本次推荐</label>
+                            <input
+                              id="followup"
+                              value={followup}
+                              onChange={(event) =>
+                                setFollowup(event.target.value)
+                              }
+                              placeholder="例如：改成90分钟以内"
+                              maxLength={1500}
+                            />
+                            <Button
+                              type="submit"
+                              disabled={!followup.trim() || recommend.isPending}
+                            >
+                              继续推荐
+                            </Button>
+                            <Button
+                              className="secondary"
+                              disabled={recommend.isPending}
+                              onClick={() => {
+                                const next = buildRequest(
+                                  "discover",
+                                  "重新开始",
+                                  region,
+                                  "",
+                                  [],
+                                );
+                                next.input_source = "natural_language";
+                                setDismissed([]);
+                                setHidden([]);
+                                setPreferences(emptyPreferences);
+                                setRuntime("");
+                                setEra("any");
+                                setDrafts(initialDrafts);
+                                startRecommendation(next);
+                              }}
+                            >
+                              重新开始
+                            </Button>
+                          </form>
+                        )}
                       {result.candidates.length > 0 && (
                         <div className="result-toolbar">
                           <Button
@@ -1620,6 +1692,30 @@ export default function App() {
                             className="secondary"
                             disabled={recommend.isPending}
                             onClick={() => {
+                              if (
+                                resultRequest?.mode === "discover" &&
+                                result.interpretation?.method === "llm-v1"
+                              ) {
+                                startRecommendation({
+                                  ...resultRequest,
+                                  query: "换一组",
+                                  clarification: undefined,
+                                  input_source: "natural_language",
+                                  constraints: {
+                                    ...result.interpretation
+                                      .effective_constraints,
+                                    exclude_movie_ids: [
+                                      ...new Set([
+                                        ...(result.interpretation
+                                          .effective_constraints
+                                          .exclude_movie_ids ?? []),
+                                        ...dismissed,
+                                      ]),
+                                    ],
+                                  },
+                                });
+                                return;
+                              }
                               const previous =
                                 resultRequest ??
                                 buildRequest(
@@ -2355,7 +2451,7 @@ function About() {
         <h2>为一场恰好的电影，少做一点选择题。</h2>
         <p>
           电影资料来自 Apple
-          美国区公开电影榜单及影片查询接口，按点选条件实时匹配。心情结合类型与简介词法线索推断，均衡探索会分散类型与导演，不是模型或影评结论。来源缓存
+          美国区公开电影榜单及影片查询接口。配置模型后可理解文字要求并在本次会话继续调整，点选与硬条件仍由代码执行。心情结合类型与简介词法线索排序，均衡探索会分散类型与导演。来源缓存
           30 分钟，保留采集时间。
         </p>
       </div>
@@ -2384,8 +2480,8 @@ function About() {
               ],
               [
                 "类型、心情与片长匹配",
-                "规则匹配已接入",
-                "文字通过规则解析常见类型、心情、时长、年代与排除；冲突或无法执行的条件需确认后才查询片库。类型、年代和片长为硬条件，文字心情仅辅助召回与排序。不具备通用模型理解能力。",
+                "模型理解与规则筛选",
+                "配置模型后由模型理解文字，未配置时沿用规则解析。冲突或无法执行的条件先确认；类型、年代和片长由代码严格筛选，心情只辅助排序。可继续补充条件、换组或重新开始，实际接入状态见上表。",
               ],
               [
                 "影片对比",

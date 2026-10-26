@@ -298,9 +298,9 @@ export interface components {
       /**
        * Method
        * @default rules-v1
-       * @constant
+       * @enum {string}
        */
-      method: "rules-v1";
+      method: "rules-v1" | "llm-v1";
       effective_constraints: components["schemas"]["Constraints"];
       /** Hard Conditions */
       hard_conditions?: string[];
@@ -486,6 +486,11 @@ export interface components {
        * @default false
        */
       natural_language: boolean;
+      /**
+       * Model Understanding
+       * @default false
+       */
+      model_understanding: boolean;
       /**
        * Long Term Memory
        * @default false

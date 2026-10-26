@@ -1,0 +1,667 @@
+{
+  "provenance": "synthetic_acceptance_spec",
+  "execution_status": "not_run_against_agent",
+  "cases": [
+    {
+      "case_id": "E01",
+      "description": "零输入探索",
+      "request": {
+        "mode": "discover",
+        "query": "什么都行，直接看看",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "structured",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {},
+      "expected_intent": {
+        "action": "recommend"
+      },
+      "expected_constraints": {},
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E01",
+        "data_mode": "synthetic",
+        "status": "ready",
+        "candidates": [
+          {
+            "movie": {
+              "movie_id": "syn:mvp-e01",
+              "title": "虚构测试影片",
+              "year": 2020,
+              "runtime_minutes": 80,
+              "genres": [
+                "喜剧"
+              ],
+              "ratings": []
+            },
+            "reason": {
+              "text": "用于校验响应结构的虚构候选。",
+              "evidence_ids": [
+                "spec-evidence-e01"
+              ],
+              "kind": "matching_inference"
+            },
+            "availability": [
+              {
+                "region": "CN",
+                "status": "unknown"
+              }
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "spec-evidence-e01",
+            "movie_id": "syn:mvp-e01",
+            "source": "MVP合成样例",
+            "url": "https://example.invalid/mvp",
+            "retrieved_at": "2026-10-26T00:00:00Z",
+            "kind": "synthetic",
+            "claim": "人工编写的资料：喜剧，80分钟。",
+            "spoiler_level": "safe"
+          }
+        ],
+        "questions": [],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false
+      }
+    },
+    {
+      "case_id": "E02",
+      "description": "普通条件",
+      "request": {
+        "mode": "discover",
+        "query": "想看轻松的喜剧，两个小时以内，不要恐怖片",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "natural_language",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {},
+      "expected_intent": {
+        "action": "recommend",
+        "updates": {
+          "genres": [
+            "喜剧"
+          ],
+          "moods": [
+            "轻松解压"
+          ],
+          "max_runtime_minutes": 120,
+          "exclude_genres": [
+            "恐怖"
+          ]
+        }
+      },
+      "expected_constraints": {
+        "genres": [
+          "喜剧"
+        ],
+        "moods": [
+          "轻松解压"
+        ],
+        "max_runtime_minutes": 120,
+        "exclude_genres": [
+          "恐怖"
+        ]
+      },
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E02",
+        "data_mode": "synthetic",
+        "status": "ready",
+        "candidates": [
+          {
+            "movie": {
+              "movie_id": "syn:mvp-e02",
+              "title": "虚构测试影片",
+              "year": 2020,
+              "runtime_minutes": 80,
+              "genres": [
+                "喜剧"
+              ],
+              "ratings": []
+            },
+            "reason": {
+              "text": "用于校验响应结构的虚构候选。",
+              "evidence_ids": [
+                "spec-evidence-e02"
+              ],
+              "kind": "matching_inference"
+            },
+            "availability": [
+              {
+                "region": "CN",
+                "status": "unknown"
+              }
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "spec-evidence-e02",
+            "movie_id": "syn:mvp-e02",
+            "source": "MVP合成样例",
+            "url": "https://example.invalid/mvp",
+            "retrieved_at": "2026-10-26T00:00:00Z",
+            "kind": "synthetic",
+            "claim": "人工编写的资料：喜剧，80分钟。",
+            "spoiler_level": "safe"
+          }
+        ],
+        "questions": [],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false
+      }
+    },
+    {
+      "case_id": "E03",
+      "description": "条件冲突",
+      "request": {
+        "mode": "discover",
+        "query": "想看恐怖片，但不要恐怖片",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "natural_language",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {},
+      "expected_intent": {
+        "action": "recommend",
+        "updates": {
+          "genres": [
+            "恐怖"
+          ],
+          "exclude_genres": [
+            "恐怖"
+          ]
+        },
+        "conflicts": [
+          "同时要求并排除恐怖片"
+        ]
+      },
+      "expected_constraints": {
+        "genres": [
+          "恐怖"
+        ],
+        "exclude_genres": [
+          "恐怖"
+        ]
+      },
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E03",
+        "data_mode": "synthetic",
+        "status": "needs_clarification",
+        "candidates": [],
+        "evidence": [],
+        "questions": [
+          {
+            "question_id": "genre_conflict",
+            "text": "这次要看恐怖片，还是排除恐怖片？",
+            "options": [
+              "看恐怖片",
+              "排除恐怖片"
+            ]
+          }
+        ],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false,
+        "clarification_id": "confirmation-e03"
+      }
+    },
+    {
+      "case_id": "E04",
+      "description": "不支持的评分要求",
+      "request": {
+        "mode": "discover",
+        "query": "豆瓣9分以上的科幻片",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "natural_language",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {},
+      "expected_intent": {
+        "action": "recommend",
+        "updates": {
+          "genres": [
+            "科幻与奇幻"
+          ]
+        },
+        "unhandled": [
+          "豆瓣评分9分以上"
+        ]
+      },
+      "expected_constraints": {
+        "genres": [
+          "科幻与奇幻"
+        ]
+      },
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E04",
+        "data_mode": "synthetic",
+        "status": "needs_clarification",
+        "candidates": [],
+        "evidence": [],
+        "questions": [
+          {
+            "question_id": "unsupported",
+            "text": "暂时无法按豆瓣评分筛选，要仅按科幻继续吗？",
+            "options": [
+              "仅按已识别条件继续"
+            ]
+          }
+        ],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false,
+        "clarification_id": "confirmation-e04"
+      }
+    },
+    {
+      "case_id": "E05",
+      "description": "沿用条件调整时长",
+      "request": {
+        "mode": "discover",
+        "query": "改成90分钟以内",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "natural_language",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {
+        "previous_constraints": {
+          "genres": [
+            "喜剧"
+          ],
+          "moods": [
+            "轻松解压"
+          ],
+          "max_runtime_minutes": 120,
+          "exclude_genres": [
+            "恐怖"
+          ]
+        }
+      },
+      "expected_intent": {
+        "action": "refine",
+        "updates": {
+          "max_runtime_minutes": 90
+        }
+      },
+      "expected_constraints": {
+        "genres": [
+          "喜剧"
+        ],
+        "moods": [
+          "轻松解压"
+        ],
+        "max_runtime_minutes": 90,
+        "exclude_genres": [
+          "恐怖"
+        ]
+      },
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E05",
+        "data_mode": "synthetic",
+        "status": "ready",
+        "candidates": [
+          {
+            "movie": {
+              "movie_id": "syn:mvp-e05",
+              "title": "虚构测试影片",
+              "year": 2020,
+              "runtime_minutes": 80,
+              "genres": [
+                "喜剧"
+              ],
+              "ratings": []
+            },
+            "reason": {
+              "text": "用于校验响应结构的虚构候选。",
+              "evidence_ids": [
+                "spec-evidence-e05"
+              ],
+              "kind": "matching_inference"
+            },
+            "availability": [
+              {
+                "region": "CN",
+                "status": "unknown"
+              }
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "spec-evidence-e05",
+            "movie_id": "syn:mvp-e05",
+            "source": "MVP合成样例",
+            "url": "https://example.invalid/mvp",
+            "retrieved_at": "2026-10-26T00:00:00Z",
+            "kind": "synthetic",
+            "claim": "人工编写的资料：喜剧，80分钟。",
+            "spoiler_level": "safe"
+          }
+        ],
+        "questions": [],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false
+      }
+    },
+    {
+      "case_id": "E06",
+      "description": "保持条件换一组",
+      "request": {
+        "mode": "discover",
+        "query": "换一组",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "natural_language",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {
+        "previous_constraints": {
+          "genres": [
+            "喜剧"
+          ],
+          "moods": [
+            "轻松解压"
+          ],
+          "max_runtime_minutes": 120,
+          "exclude_genres": [
+            "恐怖"
+          ]
+        },
+        "displayed_movie_ids": [
+          "syn:shown-1"
+        ]
+      },
+      "expected_intent": {
+        "action": "reroll"
+      },
+      "expected_constraints": {
+        "genres": [
+          "喜剧"
+        ],
+        "moods": [
+          "轻松解压"
+        ],
+        "max_runtime_minutes": 120,
+        "exclude_genres": [
+          "恐怖"
+        ],
+        "exclude_movie_ids": [
+          "syn:shown-1"
+        ]
+      },
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E06",
+        "data_mode": "synthetic",
+        "status": "ready",
+        "candidates": [
+          {
+            "movie": {
+              "movie_id": "syn:mvp-e06",
+              "title": "虚构测试影片",
+              "year": 2020,
+              "runtime_minutes": 80,
+              "genres": [
+                "喜剧"
+              ],
+              "ratings": []
+            },
+            "reason": {
+              "text": "用于校验响应结构的虚构候选。",
+              "evidence_ids": [
+                "spec-evidence-e06"
+              ],
+              "kind": "matching_inference"
+            },
+            "availability": [
+              {
+                "region": "CN",
+                "status": "unknown"
+              }
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "spec-evidence-e06",
+            "movie_id": "syn:mvp-e06",
+            "source": "MVP合成样例",
+            "url": "https://example.invalid/mvp",
+            "retrieved_at": "2026-10-26T00:00:00Z",
+            "kind": "synthetic",
+            "claim": "人工编写的资料：喜剧，80分钟。",
+            "spoiler_level": "safe"
+          }
+        ],
+        "questions": [],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false
+      }
+    },
+    {
+      "case_id": "E07",
+      "description": "临时排除",
+      "request": {
+        "mode": "discover",
+        "query": "今天不想看爱情片",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "natural_language",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {},
+      "expected_intent": {
+        "action": "recommend",
+        "updates": {
+          "exclude_genres": [
+            "爱情"
+          ]
+        }
+      },
+      "expected_constraints": {
+        "exclude_genres": [
+          "爱情"
+        ]
+      },
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E07",
+        "data_mode": "synthetic",
+        "status": "ready",
+        "candidates": [
+          {
+            "movie": {
+              "movie_id": "syn:mvp-e07",
+              "title": "虚构测试影片",
+              "year": 2020,
+              "runtime_minutes": 80,
+              "genres": [
+                "喜剧"
+              ],
+              "ratings": []
+            },
+            "reason": {
+              "text": "用于校验响应结构的虚构候选。",
+              "evidence_ids": [
+                "spec-evidence-e07"
+              ],
+              "kind": "matching_inference"
+            },
+            "availability": [
+              {
+                "region": "CN",
+                "status": "unknown"
+              }
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "spec-evidence-e07",
+            "movie_id": "syn:mvp-e07",
+            "source": "MVP合成样例",
+            "url": "https://example.invalid/mvp",
+            "retrieved_at": "2026-10-26T00:00:00Z",
+            "kind": "synthetic",
+            "claim": "人工编写的资料：喜剧，80分钟。",
+            "spoiler_level": "safe"
+          }
+        ],
+        "questions": [],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false
+      }
+    },
+    {
+      "case_id": "E08",
+      "description": "重新开始",
+      "request": {
+        "mode": "discover",
+        "query": "重新开始",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "structured",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {
+        "previous_constraints": {
+          "genres": [
+            "喜剧"
+          ],
+          "moods": [
+            "轻松解压"
+          ],
+          "max_runtime_minutes": 120,
+          "exclude_genres": [
+            "恐怖"
+          ],
+          "exclude_movie_ids": [
+            "syn:shown-1"
+          ]
+        },
+        "displayed_movie_ids": [
+          "syn:shown-1"
+        ]
+      },
+      "expected_intent": {
+        "action": "reset"
+      },
+      "expected_constraints": {},
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E08",
+        "data_mode": "synthetic",
+        "status": "ready",
+        "candidates": [
+          {
+            "movie": {
+              "movie_id": "syn:mvp-e08",
+              "title": "虚构测试影片",
+              "year": 2020,
+              "runtime_minutes": 80,
+              "genres": [
+                "喜剧"
+              ],
+              "ratings": []
+            },
+            "reason": {
+              "text": "用于校验响应结构的虚构候选。",
+              "evidence_ids": [
+                "spec-evidence-e08"
+              ],
+              "kind": "matching_inference"
+            },
+            "availability": [
+              {
+                "region": "CN",
+                "status": "unknown"
+              }
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "evidence_id": "spec-evidence-e08",
+            "movie_id": "syn:mvp-e08",
+            "source": "MVP合成样例",
+            "url": "https://example.invalid/mvp",
+            "retrieved_at": "2026-10-26T00:00:00Z",
+            "kind": "synthetic",
+            "claim": "人工编写的资料：喜剧，80分钟。",
+            "spoiler_level": "safe"
+          }
+        ],
+        "questions": [],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。"
+        ],
+        "memory_used": false
+      }
+    },
+    {
+      "case_id": "E09",
+      "description": "无合格候选",
+      "request": {
+        "mode": "discover",
+        "query": "喜剧，10分钟以内",
+        "session_id": "synthetic-mvp-session",
+        "input_source": "natural_language",
+        "memory_enabled": false,
+        "constraints": {}
+      },
+      "context": {},
+      "expected_intent": {
+        "action": "recommend",
+        "updates": {
+          "genres": [
+            "喜剧"
+          ],
+          "max_runtime_minutes": 10
+        }
+      },
+      "expected_constraints": {
+        "genres": [
+          "喜剧"
+        ],
+        "max_runtime_minutes": 10
+      },
+      "response": {
+        "contract_version": "0.1.0",
+        "trace_id": "spec-E09",
+        "data_mode": "synthetic",
+        "status": "empty",
+        "candidates": [],
+        "evidence": [],
+        "questions": [],
+        "warnings": [
+          "人工编写的合成验收样例，不代表实际模型或电影资料。",
+          "没有符合全部条件的候选，请修改条件；未自动放宽。"
+        ],
+        "memory_used": false
+      }
+    }
+  ]
+}
