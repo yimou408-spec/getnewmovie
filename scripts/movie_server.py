@@ -1,9 +1,16 @@
 """Real catalog API. Start: python -m uvicorn scripts.movie_server:app --port 8000."""
 from uuid import uuid4
 from datetime import datetime, timezone
+from collections import OrderedDict
+from threading import Lock
+from urllib.parse import urlparse
+import re
+import time
+
+import httpx
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from scripts.movie_catalog import AppleCatalog, CatalogError, MOODS
 from scripts.movie_ranking import MOOD_CLUES, rank_movies
@@ -15,6 +22,8 @@ from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, Er
 def create_app(catalog=None):
     catalog = catalog or AppleCatalog()
     sessions = IntentSessions()
+    artwork_cache = OrderedDict()
+    artwork_lock = Lock()
     app = FastAPI(title="Tonight movie catalog", version="0.1.0", description="Apple US real charts. Rule-based matching, no synthetic fallback.")
 
     @app.exception_handler(CatalogError)
@@ -38,6 +47,48 @@ def create_app(catalog=None):
         if not found:
             raise CatalogError("NOT_FOUND", "资料源未返回这部影片。", 404)
         return found[0]
+
+    @app.get("/artwork/{movie_id}", include_in_schema=False)
+    def artwork(movie_id: str):
+        # Only catalog-owned IDs can resolve artwork; callers never supply a URL.
+        with catalog.lock:
+            film, _ = find(movie_id)
+        url = str(film.poster_url or "")
+        parsed = urlparse(url)
+        if (parsed.scheme != "https" or parsed.username or parsed.password
+                or parsed.port not in (None, 443)
+                or not re.fullmatch(r"is[0-9]+(?:-ssl)?\.mzstatic\.com", parsed.hostname or "")):
+            raise CatalogError("NOT_FOUND", "这部影片暂未提供可用海报。", 404)
+        # Keep provider identity/path; request a readable portrait rendition.
+        url = re.sub(r"/[0-9]+x[0-9]+bb\.(?:jpg|png)$", "/600x900bb.jpg", url)
+        now = time.monotonic()
+        headers = {"Cache-Control": "public, max-age=1800", "X-Content-Type-Options": "nosniff"}
+        with artwork_lock:
+            cached = artwork_cache.get(url)
+            if cached and now - cached[0] < 1800:
+                artwork_cache.move_to_end(url)
+                return Response(cached[1], media_type=cached[2], headers=headers)
+        try:
+            with catalog.client.stream("GET", url, timeout=10, follow_redirects=False) as upstream:
+                media_type = upstream.headers.get("content-type", "").split(";")[0]
+                if upstream.status_code != 200 or media_type not in ("image/jpeg", "image/png", "image/webp"):
+                    raise CatalogError("UPSTREAM_UNAVAILABLE", "海报源暂时不可用，请稍后重试。", 503)
+                content = bytearray()
+                for chunk in upstream.iter_bytes():
+                    content.extend(chunk)
+                    if len(content) > 2 * 1024 * 1024:
+                        raise CatalogError("UPSTREAM_UNAVAILABLE", "海报文件过大，暂时无法展示。", 503)
+        except httpx.HTTPError as exc:
+            raise CatalogError("UPSTREAM_UNAVAILABLE", "海报加载失败，请稍后重试。", 503) from exc
+        if not content:
+            raise CatalogError("UPSTREAM_UNAVAILABLE", "海报源返回了空文件。", 503)
+        data = bytes(content)
+        with artwork_lock:
+            artwork_cache[url] = (now, data, media_type)
+            artwork_cache.move_to_end(url)
+            while len(artwork_cache) > 32:
+                artwork_cache.popitem(last=False)
+        return Response(data, media_type=media_type, headers=headers)
 
     @app.post("/recommendations", response_model=RecommendationResponse, responses={503: {"model": ErrorResponse}, 504: {"model": ErrorResponse}})
     def recommendations(body: RecommendationRequest):

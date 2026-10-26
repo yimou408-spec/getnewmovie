@@ -95,8 +95,12 @@ for (const [name, body, status] of [
       return route.fulfill({ json: body, status });
     });
     await page.goto("/");
+    await expect(page.locator(".results")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
     await page
-      .getByRole("button", { name: "什么都行，直接看看", exact: true })
+      .getByRole("button", { name: "我有一点想法", exact: true })
       .click();
     if ("candidates" in body) {
       await expect(page.locator(".candidate-grid > article")).toHaveCount(
@@ -137,9 +141,8 @@ test("P01 HTTP 422 requests correction without a retry loop", async ({
     route.fulfill({ status: 422, json: { detail: [], trace_id: "p01-422" } }),
   );
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "什么都行，直接看看", exact: true })
-    .click();
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("输入未通过服务校验");
   await expect(
     page.getByRole("button", { name: "重新尝试", exact: true }),
@@ -164,11 +167,12 @@ test("P01 unavailable provider retains the previous candidates", async ({
         });
   });
   await page.goto("/");
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const start = page.getByRole("button", {
     name: "什么都行，直接看看",
     exact: true,
   });
-  await start.click();
   await expect(page.locator(".candidate-grid > article")).toHaveCount(3);
   await start.click();
   await expect(page.getByRole("alert")).toContainText("资料源暂时不可用");
@@ -200,12 +204,13 @@ test("P01 cancel then resubmit cannot be overwritten by an older response", asyn
     } else await route.fulfill({ json: calls === 1 ? success : latest });
   });
   await page.goto("/");
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const start = page.getByRole("button", {
     name: "什么都行，直接看看",
     exact: true,
   });
   try {
-    await start.click();
     await expect(page.locator(".candidate-grid > article")).toHaveCount(3);
     await start.click();
     await expect.poll(() => calls).toBe(2);

@@ -1,8 +1,12 @@
 name: S0 offline contracts and experiments
 on: [push, pull_request]
+concurrency:
+  group: offline-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   offline:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

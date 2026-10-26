@@ -11,6 +11,8 @@ test("real refinement: remove one condition, submit it and return without losing
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const input = page.getByLabel("说说今晚想看什么（可选）", { exact: true });
   const mood = page.getByRole("group", { name: "想要什么感觉？" });
   const genre = page.getByRole("group", { name: "想看哪种故事？" });
@@ -97,7 +99,7 @@ test("real refinement: remove one condition, submit it and return without losing
   });
   await page.getByRole("button", { name: "修改选片条件", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "没想法，也能开始", exact: true }),
+    page.getByRole("heading", { name: "精细选片", exact: true }),
   ).toBeFocused();
   await expect(
     genre.getByRole("button", { name: "剧情", exact: true }),
@@ -117,4 +119,68 @@ test("real refinement: remove one condition, submit it and return without losing
     ).violations,
   ).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test("film-first home loads real films before asking for input and rerolls", async ({
+  page,
+}, info) => {
+  const response = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/recommendations") &&
+      r.request().method() === "POST",
+  );
+  await page.goto("/");
+  const initial = await response;
+  expect(initial.status()).toBe(200);
+  const data = await initial.json();
+  expect(["live", "cached"]).toContain(data.data_mode);
+  await expect(page.locator(".stage-film")).toHaveCount(3);
+  await expect(page.locator(".filter-workbench")).not.toHaveAttribute("open");
+  await expect(
+    page.getByLabel("说说今晚想看什么（可选）", { exact: true }),
+  ).not.toBeVisible();
+  for (const image of await page.locator(".poster-stage img").all()) {
+    await expect
+      .poll(
+        () =>
+          image.evaluate(
+            (el: HTMLImageElement) => el.complete && el.naturalWidth > 0,
+          ),
+        { timeout: 20000 },
+      )
+      .toBe(true);
+  }
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `${screenshots}/${info.project.name}-film-first.png`,
+    fullPage: true,
+  });
+  const next = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/recommendations") &&
+      r.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "换一组真实电影", exact: true })
+    .click();
+  const rerolled = await next;
+  expect(rerolled.status()).toBe(200);
+  const ids = data.candidates.map((c: any) => c.movie.movie_id);
+  expect(
+    rerolled.request().postDataJSON().constraints.exclude_movie_ids,
+  ).toEqual(expect.arrayContaining(ids));
+  expect(
+    (await rerolled.json()).candidates.every(
+      (c: any) => !ids.includes(c.movie.movie_id),
+    ),
+  ).toBe(true);
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "精细选片", exact: true }),
+  ).toBeFocused();
+  await expect(page.locator(".filter-workbench")).toHaveAttribute("open", "");
 });

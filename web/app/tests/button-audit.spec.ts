@@ -46,6 +46,8 @@ async function recommend(page: Page, name = "什么都行，直接看看") {
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
 });
 
 test("audit: reroll remains usable after navigation and cancellation", async ({

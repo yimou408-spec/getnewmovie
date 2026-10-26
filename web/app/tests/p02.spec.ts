@@ -70,6 +70,8 @@ async function accessible(page: Page) {
 }
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
 });
 
 test("P02 real natural text changes hard conditions and soft mood, with visible interpretation", async ({
