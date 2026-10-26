@@ -648,6 +648,76 @@
               "contains_spoilers"
             ],
             "title": "Spoiler Level"
+          },
+          "granularity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "metadata",
+                  "rating",
+                  "excerpt",
+                  "full_text"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granularity"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "source_content_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Content Id"
+          },
+          "independent_source_group": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independent Source Group"
+          },
+          "usage_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "unverified",
+                  "licensed",
+                  "provider_terms",
+                  "synthetic"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Basis"
           }
         },
         "additionalProperties": false,
@@ -663,6 +733,58 @@
           "spoiler_level"
         ],
         "title": "Evidence"
+      },
+      "ExternalMovieIdentity": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "douban",
+              "tmdb",
+              "itunes"
+            ],
+            "title": "Provider"
+          },
+          "external_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "title": "External Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "candidate",
+              "confirmed"
+            ],
+            "title": "Status"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "title_year",
+              "human_verified",
+              "provider_mapping"
+            ],
+            "title": "Basis"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "external_id",
+          "status",
+          "url",
+          "basis"
+        ],
+        "title": "ExternalMovieIdentity"
       },
       "HTTPValidationError": {
         "properties": {
@@ -878,6 +1000,21 @@
               }
             ],
             "title": "Content Advisory"
+          },
+          "external_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExternalMovieIdentity"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Ids"
           }
         },
         "additionalProperties": false,
@@ -1227,6 +1364,20 @@
               }
             ],
             "title": "Clarification Id"
+          },
+          "source_results": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SourceEvidenceResult"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Results"
           }
         },
         "additionalProperties": false,
@@ -1299,6 +1450,73 @@
           "expires_in_seconds"
         ],
         "title": "SessionResponse"
+      },
+      "SourceEvidenceResult": {
+        "properties": {
+          "movie_id": {
+            "type": "string",
+            "title": "Movie Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_results",
+              "not_configured",
+              "access_limited",
+              "timeout",
+              "parse_error",
+              "upstream_error",
+              "budget_exhausted",
+              "ambiguous"
+            ],
+            "title": "Status"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "ratings": {
+            "items": {
+              "$ref": "#/components/schemas/Rating"
+            },
+            "type": "array",
+            "title": "Ratings"
+          },
+          "cache_status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "fresh",
+              "stale"
+            ],
+            "title": "Cache Status",
+            "default": "none"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "movie_id",
+          "source",
+          "status"
+        ],
+        "title": "SourceEvidenceResult",
+        "description": "Adapter result; availability is separate from the amount of evidence."
       },
       "ValidationError": {
         "properties": {

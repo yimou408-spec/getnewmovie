@@ -1,0 +1,254 @@
+{
+  "$defs": {
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "movie_id": {
+          "title": "Movie Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "metadata",
+            "review",
+            "rating",
+            "synthetic"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "claim": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Claim",
+          "type": "string"
+        },
+        "spoiler_level": {
+          "enum": [
+            "safe",
+            "unknown",
+            "contains_spoilers"
+          ],
+          "title": "Spoiler Level",
+          "type": "string"
+        },
+        "granularity": {
+          "anyOf": [
+            {
+              "enum": [
+                "metadata",
+                "rating",
+                "excerpt",
+                "full_text"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Granularity"
+        },
+        "author": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author"
+        },
+        "source_content_id": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Content Id"
+        },
+        "independent_source_group": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Independent Source Group"
+        },
+        "usage_basis": {
+          "anyOf": [
+            {
+              "enum": [
+                "unverified",
+                "licensed",
+                "provider_terms",
+                "synthetic"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usage Basis"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "movie_id",
+        "source",
+        "url",
+        "retrieved_at",
+        "kind",
+        "claim",
+        "spoiler_level"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Rating": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "minimum": 0,
+          "title": "Value",
+          "type": "number"
+        },
+        "scale": {
+          "exclusiveMinimum": 0,
+          "title": "Scale",
+          "type": "number"
+        },
+        "vote_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vote Count"
+        },
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "value",
+        "scale",
+        "evidence_id"
+      ],
+      "title": "Rating",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Adapter result; availability is separate from the amount of evidence.",
+  "properties": {
+    "movie_id": {
+      "title": "Movie Id",
+      "type": "string"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "no_results",
+        "not_configured",
+        "access_limited",
+        "timeout",
+        "parse_error",
+        "upstream_error",
+        "budget_exhausted",
+        "ambiguous"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "ratings": {
+      "items": {
+        "$ref": "#/$defs/Rating"
+      },
+      "title": "Ratings",
+      "type": "array"
+    },
+    "cache_status": {
+      "default": "none",
+      "enum": [
+        "none",
+        "fresh",
+        "stale"
+      ],
+      "title": "Cache Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "movie_id",
+    "source",
+    "status"
+  ],
+  "title": "SourceEvidenceResult",
+  "type": "object"
+}

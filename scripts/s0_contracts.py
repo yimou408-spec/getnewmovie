@@ -103,6 +103,29 @@ class Rating(StrictModel):
         return self
 
 
+class ExternalMovieIdentity(StrictModel):
+    provider: Literal["douban", "tmdb", "itunes"]
+    external_id: str = Field(pattern=r"^[1-9][0-9]*$")
+    status: Literal["candidate", "confirmed"]
+    url: HttpUrl
+    basis: Literal["title_year", "human_verified", "provider_mapping"]
+
+    @model_validator(mode="after")
+    def check_confirmation(self):
+        if self.status == "confirmed" and self.basis == "title_year":
+            raise ValueError("title/year match alone cannot confirm a cross-source identity")
+        hosts = {"douban": {"movie.douban.com"}, "tmdb": {"www.themoviedb.org"},
+                 "itunes": {"itunes.apple.com", "tv.apple.com"}}
+        paths = {"douban": f"/subject/{self.external_id}/", "tmdb": f"/movie/{self.external_id}"}
+        if (self.url.scheme != "https" or self.url.host not in hosts[self.provider]
+                or self.url.username or self.url.password or self.url.query or self.url.fragment
+                or self.url.port not in {None, 443}):
+            raise ValueError("external identity requires a public provider HTTPS URL")
+        if self.provider in paths and self.url.path != paths[self.provider]:
+            raise ValueError("external identity URL must match its provider ID")
+        return self
+
+
 class Movie(StrictModel):
     movie_id: str = Field(pattern=r"^(syn:[A-Za-z0-9_-]+|tmdb:[1-9][0-9]*|itunes:[1-9][0-9]*)$")
     title: str
@@ -116,6 +139,15 @@ class Movie(StrictModel):
     source_url: HttpUrl | None = None
     director: str | None = None
     content_advisory: str | None = None
+    # Additive: the original movie_id remains the public selection identity.
+    external_ids: list[ExternalMovieIdentity] | None = Field(default=None, max_length=10)
+
+    @model_validator(mode="after")
+    def unique_external_providers(self):
+        providers = [link.provider for link in self.external_ids or []]
+        if len(providers) != len(set(providers)):
+            raise ValueError("external provider mapping must be unique")
+        return self
 
 
 class Evidence(StrictModel):
@@ -127,6 +159,45 @@ class Evidence(StrictModel):
     kind: Literal["metadata", "review", "rating", "synthetic"]
     claim: str = Field(min_length=1, max_length=1000)
     spoiler_level: Literal["safe", "unknown", "contains_spoilers"]
+    granularity: Literal["metadata", "rating", "excerpt", "full_text"] | None = None
+    author: str | None = Field(default=None, max_length=160)
+    source_content_id: str | None = Field(default=None, max_length=160)
+    independent_source_group: str | None = Field(default=None, max_length=160)
+    usage_basis: Literal["unverified", "licensed", "provider_terms", "synthetic"] | None = None
+
+    @model_validator(mode="after")
+    def check_granularity(self):
+        allowed = {"metadata": {None, "metadata"}, "rating": {None, "rating"},
+                   "review": {None, "excerpt", "full_text"},
+                   "synthetic": {None, "metadata", "rating", "excerpt", "full_text"}}
+        if self.granularity not in allowed[self.kind]:
+            raise ValueError("evidence kind must match its content granularity")
+        return self
+
+
+class SourceEvidenceResult(StrictModel):
+    """Adapter result; availability is separate from the amount of evidence."""
+    movie_id: str
+    source: str
+    status: Literal["ok", "no_results", "not_configured", "access_limited", "timeout",
+                    "parse_error", "upstream_error", "budget_exhausted", "ambiguous"]
+    evidence: list[Evidence] = Field(default_factory=list)
+    ratings: list[Rating] = Field(default_factory=list)
+    cache_status: Literal["none", "fresh", "stale"] = "none"
+    warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_binding(self):
+        evidence_map = {item.evidence_id: item for item in self.evidence}
+        if len(evidence_map) != len(self.evidence):
+            raise ValueError("duplicate evidence ID")
+        if any(e.movie_id != self.movie_id or e.source != self.source for e in self.evidence):
+            raise ValueError("adapter evidence must belong to its movie and source")
+        for rating in self.ratings:
+            evidence = evidence_map.get(rating.evidence_id)
+            if evidence is None or evidence.kind != "rating" or rating.source != self.source:
+                raise ValueError("rating requires matching rating evidence")
+        return self
 
 
 class Reason(StrictModel):
@@ -172,6 +243,7 @@ class RecommendationResponse(StrictModel):
     matched_count: int | None = Field(default=None, ge=0)
     interpretation: Interpretation | None = None
     clarification_id: str | None = None
+    source_results: list[SourceEvidenceResult] | None = None
 
     @model_validator(mode="after")
     def validate_state_and_references(self):
@@ -189,6 +261,12 @@ class RecommendationResponse(StrictModel):
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate movie ID")
         evidence_map = {e.evidence_id: e for e in self.evidence}
+        for result in self.source_results or []:
+            if result.movie_id not in ids:
+                raise ValueError("source result must belong to a returned film")
+            for item in result.evidence:
+                if evidence_map.get(item.evidence_id) != item:
+                    raise ValueError("source result evidence must match the response evidence")
         if len(evidence_map) != len(self.evidence):
             raise ValueError("duplicate evidence ID")
         for candidate in self.candidates:

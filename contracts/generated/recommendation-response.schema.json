@@ -282,6 +282,81 @@
           ],
           "title": "Spoiler Level",
           "type": "string"
+        },
+        "granularity": {
+          "anyOf": [
+            {
+              "enum": [
+                "metadata",
+                "rating",
+                "excerpt",
+                "full_text"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Granularity"
+        },
+        "author": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author"
+        },
+        "source_content_id": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Content Id"
+        },
+        "independent_source_group": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Independent Source Group"
+        },
+        "usage_basis": {
+          "anyOf": [
+            {
+              "enum": [
+                "unverified",
+                "licensed",
+                "provider_terms",
+                "synthetic"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usage Basis"
         }
       },
       "required": [
@@ -295,6 +370,58 @@
         "spoiler_level"
       ],
       "title": "Evidence",
+      "type": "object"
+    },
+    "ExternalMovieIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "enum": [
+            "douban",
+            "tmdb",
+            "itunes"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "external_id": {
+          "pattern": "^[1-9][0-9]*$",
+          "title": "External Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "candidate",
+            "confirmed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "basis": {
+          "enum": [
+            "title_year",
+            "human_verified",
+            "provider_mapping"
+          ],
+          "title": "Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "external_id",
+        "status",
+        "url",
+        "basis"
+      ],
+      "title": "ExternalMovieIdentity",
       "type": "object"
     },
     "Interpretation": {
@@ -465,6 +592,22 @@
           ],
           "default": null,
           "title": "Content Advisory"
+        },
+        "external_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ExternalMovieIdentity"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Ids"
         }
       },
       "required": [
@@ -579,6 +722,73 @@
         "kind"
       ],
       "title": "Reason",
+      "type": "object"
+    },
+    "SourceEvidenceResult": {
+      "additionalProperties": false,
+      "description": "Adapter result; availability is separate from the amount of evidence.",
+      "properties": {
+        "movie_id": {
+          "title": "Movie Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "no_results",
+            "not_configured",
+            "access_limited",
+            "timeout",
+            "parse_error",
+            "upstream_error",
+            "budget_exhausted",
+            "ambiguous"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "ratings": {
+          "items": {
+            "$ref": "#/$defs/Rating"
+          },
+          "title": "Ratings",
+          "type": "array"
+        },
+        "cache_status": {
+          "default": "none",
+          "enum": [
+            "none",
+            "fresh",
+            "stale"
+          ],
+          "title": "Cache Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "movie_id",
+        "source",
+        "status"
+      ],
+      "title": "SourceEvidenceResult",
       "type": "object"
     }
   },
@@ -695,6 +905,21 @@
       ],
       "default": null,
       "title": "Clarification Id"
+    },
+    "source_results": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/SourceEvidenceResult"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Results"
     }
   },
   "required": [

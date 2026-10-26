@@ -275,6 +275,42 @@ export interface components {
        * @enum {string}
        */
       spoiler_level: "safe" | "unknown" | "contains_spoilers";
+      /** Granularity */
+      granularity?: ("metadata" | "rating" | "excerpt" | "full_text") | null;
+      /** Author */
+      author?: string | null;
+      /** Source Content Id */
+      source_content_id?: string | null;
+      /** Independent Source Group */
+      independent_source_group?: string | null;
+      /** Usage Basis */
+      usage_basis?:
+        ("unverified" | "licensed" | "provider_terms" | "synthetic") | null;
+    };
+    /** ExternalMovieIdentity */
+    ExternalMovieIdentity: {
+      /**
+       * Provider
+       * @enum {string}
+       */
+      provider: "douban" | "tmdb" | "itunes";
+      /** External Id */
+      external_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "candidate" | "confirmed";
+      /**
+       * Url
+       * Format: uri
+       */
+      url: string;
+      /**
+       * Basis
+       * @enum {string}
+       */
+      basis: "title_year" | "human_verified" | "provider_mapping";
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -337,6 +373,8 @@ export interface components {
       director?: string | null;
       /** Content Advisory */
       content_advisory?: string | null;
+      /** External Ids */
+      external_ids?: components["schemas"]["ExternalMovieIdentity"][] | null;
     };
     /** MovieSearchResponse */
     MovieSearchResponse: {
@@ -460,6 +498,8 @@ export interface components {
       interpretation?: components["schemas"]["Interpretation"] | null;
       /** Clarification Id */
       clarification_id?: string | null;
+      /** Source Results */
+      source_results?: components["schemas"]["SourceEvidenceResult"][] | null;
     };
     /**
      * ServiceCapabilities
@@ -503,6 +543,42 @@ export interface components {
       session_id: string;
       /** Expires In Seconds */
       expires_in_seconds: number;
+    };
+    /**
+     * SourceEvidenceResult
+     * @description Adapter result; availability is separate from the amount of evidence.
+     */
+    SourceEvidenceResult: {
+      /** Movie Id */
+      movie_id: string;
+      /** Source */
+      source: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status:
+        | "ok"
+        | "no_results"
+        | "not_configured"
+        | "access_limited"
+        | "timeout"
+        | "parse_error"
+        | "upstream_error"
+        | "budget_exhausted"
+        | "ambiguous";
+      /** Evidence */
+      evidence?: components["schemas"]["Evidence"][];
+      /** Ratings */
+      ratings?: components["schemas"]["Rating"][];
+      /**
+       * Cache Status
+       * @default none
+       * @enum {string}
+       */
+      cache_status: "none" | "fresh" | "stale";
+      /** Warnings */
+      warnings?: string[];
     };
     /** ValidationError */
     ValidationError: {

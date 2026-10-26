@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.s0_contracts import ErrorResponse, HealthResponse, Movie, RecommendationRequest, RecommendationResponse
+from scripts.s0_contracts import ErrorResponse, HealthResponse, Movie, RecommendationRequest, RecommendationResponse, SourceEvidenceResult
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +16,8 @@ def check_data():
                   "timeout": ErrorResponse, "unconfigured": ErrorResponse}
         model = models.get(path.stem, RecommendationResponse)
         model.model_validate_json(path.read_text(encoding="utf-8"))
+    for path in (ROOT / "contracts/adapter-examples").glob("*.json"):
+        SourceEvidenceResult.model_validate_json(path.read_text(encoding="utf-8"))
     tasks = json.loads((ROOT / "data/s0/eval_tasks.json").read_text(encoding="utf-8"))
     if len(tasks) != 30 or len({task["task_id"] for task in tasks}) != 30:
         raise ValueError("Expected 30 unique evaluation tasks")

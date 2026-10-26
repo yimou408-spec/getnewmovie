@@ -1,0 +1,9 @@
+{
+  "movie_id": "syn:y02-demo",
+  "source": "Douban",
+  "status": "access_limited",
+  "evidence": [],
+  "ratings": [],
+  "cache_status": "none",
+  "warnings": ["Synthetic fixture: redirected to a security check. Not a live movie response."]
+}

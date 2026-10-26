@@ -1,0 +1,25 @@
+{
+  "movie_id": "syn:y02-demo",
+  "source": "Douban",
+  "status": "ok",
+  "evidence": [
+    {
+      "evidence_id": "syn:y02-excerpt",
+      "movie_id": "syn:y02-demo",
+      "source": "Douban",
+      "url": "https://douban.invalid/subject/demo/comment/demo",
+      "retrieved_at": "2026-10-26T00:00:00Z",
+      "kind": "review",
+      "claim": "虚构测试观点：节奏舒缓。该文本不是豆瓣实际评价。",
+      "spoiler_level": "unknown",
+      "granularity": "excerpt",
+      "author": "Synthetic test author",
+      "source_content_id": "syn:test-comment",
+      "independent_source_group": null,
+      "usage_basis": "synthetic"
+    }
+  ],
+  "ratings": [],
+  "cache_status": "none",
+  "warnings": ["Synthetic offline fixture only; unknown spoilers are not safe for default preview."]
+}
