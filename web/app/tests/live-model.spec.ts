@@ -16,6 +16,10 @@ test("REAL local Qwen and Apple complete the rendered recommendation workflow", 
   expect(config.model_location).toBe("local");
   expect(config.model_name).toBe("qwen2.5-1.5b-instruct-q4_k_m");
   await page.goto("/");
+  // Finish the initial catalog request before observing the submitted recommendation.
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false", {
+    timeout: 50_000,
+  });
   await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await page
     .getByRole("textbox", { name: "说说今晚想看什么（可选）" })
