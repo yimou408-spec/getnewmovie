@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository is at S0: movie recommendation feasibility, contracts, and prototypes. The production recommendation service is not implemented.
+This repository contains the S0 experiments and a running Apple-catalog movie application. The current MVP adds model interpretation and a LangGraph workflow; it is not a production service. Read `docs/MVP开发工作记录.md` for current scope, actual results, and remaining work; historical three-person schedules are reference only. Prefer updating existing Markdown files over creating new ones.
 
 - `scripts/`: Pydantic contracts, FastAPI mock, schema exporter, probes, and evaluation utilities.
 - `tests/s0/`: offline contract, HTTP, evaluation, and prototype syntax tests.
@@ -40,4 +40,4 @@ History uses messages such as `docs: add three-person development plan and TDD s
 
 ## Configuration & Data Handling
 
-Keep all `.env` and `.env.*` files local and untracked, including `.env.example`; scripts do not automatically load `.env`. Consult `docs/s0/README.md` for variable names. Keep secrets and reports under ignored paths. Live probes require `--live` and explicit environment configuration. Preserve synthetic labels and pending-review status; do not represent fixtures as verified movie data or upload raw interview material.
+Keep all `.env` and `.env.*` files local and untracked, including `.env.example`. The MVP model adapter (`scripts/mvp_model.py`) reads the repository-root `.env`, with process environment taking precedence; legacy S0 probes still read process environment only. Consult `docs/MVP开发工作记录.md` for MVP configuration and `docs/s0/README.md` for legacy probe variables. Keep secrets and reports under ignored paths. Live probes require `--live` and explicit configuration. Preserve synthetic labels and pending-review status; do not represent fixtures as verified movie data or upload raw interview material.

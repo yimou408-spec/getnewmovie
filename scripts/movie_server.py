@@ -1,6 +1,5 @@
 """Real catalog API. Start: python -m uvicorn scripts.movie_server:app --port 8000."""
 from uuid import uuid4
-from datetime import datetime, timezone
 from collections import OrderedDict
 from threading import Lock
 from urllib.parse import urlparse
@@ -13,15 +12,24 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, Response
 
 from scripts.movie_catalog import AppleCatalog, CatalogError, MOODS
-from scripts.movie_ranking import MOOD_CLUES, rank_movies
+from scripts.movie_ranking import MOOD_CLUES
+from scripts.mvp_recommendation_rules import MovieSelection, select_movies
+from scripts.mvp_model import ModelAdapter, ModelSettings
+from scripts.mvp_workflow import AgentContext, AgentWorkflow
 from scripts.movie_intent import IntentSessions, explain
 from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
                                   MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities, SessionResponse)
 
 
-def create_app(catalog=None):
+def create_app(catalog=None, *, model_factory=None):
+    if catalog is None and model_factory is None:
+        settings = ModelSettings.from_env()
+        if settings is not None:
+            model_factory = lambda: ModelAdapter(settings, max_requests=1)
     catalog = catalog or AppleCatalog()
     sessions = IntentSessions()
+    agent_contexts = {}
+    workflow = AgentWorkflow(catalog, model_factory) if model_factory else None
     artwork_cache = OrderedDict()
     artwork_lock = Lock()
     app = FastAPI(title="Tonight movie catalog", version="0.1.0", description="Apple US real charts. Rule-based matching, no synthetic fallback.")
@@ -38,7 +46,8 @@ def create_app(catalog=None):
     @app.get("/health", response_model=HealthResponse)
     def health():
         return HealthResponse(service="real-catalog", provider="Apple iTunes US", synthetic_fallback=False,
-                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, natural_language=True))
+                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, natural_language=True,
+                                                                                      model_understanding=workflow is not None))
 
     def find(mid):
         if not mid.startswith("itunes:"):
@@ -92,45 +101,57 @@ def create_app(catalog=None):
 
     @app.post("/recommendations", response_model=RecommendationResponse, responses={503: {"model": ErrorResponse}, 504: {"model": ErrorResponse}})
     def recommendations(body: RecommendationRequest):
-        interpretation, clarification_id, questions = (sessions.resolve(body) if body.input_source == "natural_language"
-                                                       else (explain(body.constraints), None, []))
+        agent_result = None
+        workflow_before = catalog.fetch_count
+        if workflow is not None and body.mode == "discover":
+            context = None
+            if body.input_source == "natural_language":
+                with sessions.lock:
+                    valid_ids = {sid for sid, entry in sessions.sessions.items() if entry[0] > sessions.clock()}
+                    for sid in list(agent_contexts):
+                        if sid not in valid_ids:
+                            del agent_contexts[sid]
+                    if body.session_id not in valid_ids:
+                        raise CatalogError("SESSION_EXPIRED", "临时会话已过期，请重新提交观影想法。", 409)
+                    context = agent_contexts.get(body.session_id, AgentContext())
+            agent_result = workflow.run(body, context)
+            if agent_result.status == "error":
+                code = agent_result.error_code
+                if code in ("STALE_CLARIFICATION", "INVALID_CLARIFICATION"):
+                    raise CatalogError(code, "确认条件已变化，请修改或重新提交。", 409 if code == "STALE_CLARIFICATION" else 422)
+                timeout = code in ("MODEL_TIMEOUT", "WORKFLOW_TIMEOUT")
+                raise CatalogError("UPSTREAM_TIMEOUT" if timeout else "UPSTREAM_UNAVAILABLE",
+                                   "模型理解暂时未完成，请重试；原有结果仍保留。", 504 if timeout else 503)
+            if body.input_source == "natural_language":
+                with sessions.lock:
+                    agent_contexts[body.session_id] = agent_result.context
+            interpretation = explain(agent_result.constraints, method=agent_result.method,
+                                     conflicts=agent_result.conflicts, unhandled=agent_result.unhandled)
+            clarification_id, questions = agent_result.clarification_id, agent_result.questions
+        else:
+            interpretation, clarification_id, questions = (sessions.resolve(body) if body.input_source == "natural_language"
+                                                           else (explain(body.constraints), None, []))
         if questions:
             return RecommendationResponse(trace_id=uuid4().hex, data_mode="live", status="needs_clarification",
                 candidates=[], evidence=[], questions=questions, warnings=["尚未查询片库。请确认冲突或无法执行的要求，也可以修改输入重新提交。"],
                 memory_used=False, interpretation=interpretation, clarification_id=clarification_id)
         with catalog.lock:
-            before = catalog.fetch_count
+            before = workflow_before if agent_result is not None else catalog.fetch_count
             c = interpretation.effective_constraints
             mood_genres = set().union(*(MOODS[m] for m in c.moods)) if c.moods else set()
             pool_genres = c.genres or sorted(mood_genres) or (["家庭"] if c.company == "和家人" else [])
-            if body.mode == "known_movie":
+            if agent_result is not None:
+                films = agent_result.candidates
+            elif body.mode == "known_movie":
                 films = [find(body.movie_id)]
             elif body.mode == "watchlist":
                 films = [find(mid) for mid in dict.fromkeys(body.watchlist_movie_ids)]
             else:
                 films = catalog.pool(pool_genres)
-            eligible = []
-            for movie, at in films:
-                genres = set(movie.genres)
-                if movie.movie_id in c.exclude_movie_ids or genres.intersection(c.exclude_genres):
-                    continue
-                if c.genres and not genres.intersection(c.genres):
-                    continue
-                if c.company == "和家人" and not genres.intersection({"家庭", "动画"}):
-                    continue
-                if c.max_runtime_minutes is not None and (movie.runtime_minutes is None or movie.runtime_minutes > c.max_runtime_minutes):
-                    continue
-                if c.era != "any":
-                    if movie.year is None:
-                        continue
-                    bounds = {"recent": (2020, datetime.now(timezone.utc).year), "2000s": (2000, 2019), "classic": (1888, 1999)}
-                    low, high = bounds[c.era]
-                    if not low <= movie.year <= high:
-                        continue
-                eligible.append((movie, at))
-            eligible = rank_movies(eligible, c)
+            selection = MovieSelection(films, films) if agent_result is not None else select_movies(films, c)
+            eligible = selection.eligible
             candidates, evidence = [], []
-            for movie, at in eligible[:3]:
+            for movie, at in selection.candidates:
                 eid = f"apple-{movie.movie_id.split(':')[1]}"
                 facts = f"Apple 美国区分类：{'、'.join(movie.genres)}；正片时长：{movie.runtime_minutes or '未知'} 分钟。"
                 facts += f"导演：{movie.director or '未知'}；美国内容分级：{movie.content_advisory or '未知'}。"
@@ -161,15 +182,18 @@ def create_app(catalog=None):
             if c.company:
                 warnings.append("和家人会限定家庭/动画类别，仍需自行核对适龄；其他同行选项仅记录本次情境，不影响排序。")
             if body.input_source == "natural_language":
-                warnings.append("文字由规则解析器处理，支持常见类型、心情、时长、年代与排除；不代表通用模型理解。心情为软偏好，不能保证内容感受。")
+                warnings.append("文字由模型理解并经代码筛选；心情为软偏好，不能保证内容感受。" if interpretation.method == "llm-v1" else "文字由规则解析器处理，支持常见类型、心情、时长、年代与排除；不代表通用模型理解。心情为软偏好，不能保证内容感受。")
                 if interpretation.unhandled:
                     warnings.append("经你确认未采用：" + "；".join(interpretation.unhandled))
             elif body.query and ("补充：" in body.query or body.mode != "discover"):
                 warnings.append("补充文字暂不参与匹配；当前使用点选条件和已确认影片。")
             if not eligible:
-                warnings.insert(0, f"当前查得的 {len(films)} 部影片没有符合全部条件的结果。请放宽时长、年代或类型条件；不会用样例补齐。")
+                total = agent_result.catalog_size if agent_result is not None else len(films)
+                warnings.insert(0, f"当前查得的 {total} 部影片没有符合全部条件的结果。请放宽时长、年代或类型条件；不会用样例补齐。")
             return RecommendationResponse(trace_id=uuid4().hex, data_mode="cached" if before == catalog.fetch_count else "live", status="ready" if candidates else "empty",
-                candidates=candidates, evidence=evidence, questions=[], warnings=warnings, memory_used=False, catalog_size=len(films), matched_count=len(eligible), interpretation=interpretation)
+                candidates=candidates, evidence=evidence, questions=[], warnings=warnings, memory_used=False,
+                catalog_size=agent_result.catalog_size if agent_result is not None else len(films),
+                matched_count=agent_result.matched_count if agent_result is not None else len(eligible), interpretation=interpretation)
 
     @app.get("/movies", response_model=MovieSearchResponse)
     def movies(query: str = Query(min_length=1, max_length=100), year: int | None = None):

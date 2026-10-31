@@ -24,6 +24,11 @@
           "title": "Natural Language",
           "type": "boolean"
         },
+        "model_understanding": {
+          "default": false,
+          "title": "Model Understanding",
+          "type": "boolean"
+        },
         "long_term_memory": {
           "default": false,
           "title": "Long Term Memory",

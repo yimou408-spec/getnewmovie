@@ -301,8 +301,11 @@
       "additionalProperties": false,
       "properties": {
         "method": {
-          "const": "rules-v1",
           "default": "rules-v1",
+          "enum": [
+            "rules-v1",
+            "llm-v1"
+          ],
           "title": "Method",
           "type": "string"
         },
