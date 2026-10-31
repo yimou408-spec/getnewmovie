@@ -171,10 +171,11 @@ test("OFFLINE TMDB keeps provider links, rating evidence and official attributio
   });
   await page.goto("/");
   await page
-    .getByRole("button", { name: "什么都行，直接看看", exact: true })
+    .getByRole("button", { name: "看看今晚的电影", exact: true })
     .click();
   const card = page.locator(".candidate-grid > article");
   await expect(card).toHaveCount(1);
+  await card.getByText("查看资料与观看提醒", { exact: true }).click();
   await expect(
     card.getByRole("link", { name: "在 TMDB 核对影片资料" }),
   ).toHaveAttribute("href", "https://www.themoviedb.org/movie/101");

@@ -258,7 +258,11 @@ function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
           <>
             <img
               key={attempt}
-              src={`/api/artwork/${encodeURIComponent(movie.movie_id)}?attempt=${attempt}`}
+              src={
+                movie.movie_id.startsWith("tmdb:")
+                  ? (url ?? undefined)
+                  : `/api/artwork/${encodeURIComponent(movie.movie_id)}?attempt=${attempt}`
+              }
               alt={`${movie.title} 海报`}
               loading="eager"
               decoding="async"
