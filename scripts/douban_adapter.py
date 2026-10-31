@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import httpx
 
 from scripts.s0_contracts import Evidence, Rating, SourceEvidenceResult
+from app.services.budget import consume
 
 BASE_URL = "https://movie.douban.com"
 SOURCE = "Douban"
@@ -117,6 +118,7 @@ class PageParser(HTMLParser):
 
 
 class DoubanAdapter:
+    source = SOURCE
     def __init__(self, client, max_requests=9):
         if not 1 <= max_requests <= 30:
             raise ValueError("request budget must be 1..30")
@@ -128,11 +130,12 @@ class DoubanAdapter:
             raise ValueError("unsupported Douban path")
         if self.calls >= self.max_requests:
             return None, "budget_exhausted"
+        timeout = consume(search=path == "/j/subject_suggest", timeout=self.client.timeout.read or 8)
         self.calls += 1
         started = time.perf_counter()
         status, response, host, redirect_path = "upstream_error", None, None, None
         try:
-            response = self.client.get(BASE_URL + path, params=params, follow_redirects=False)
+            response = self.client.get(BASE_URL + path, params=params, follow_redirects=False, timeout=timeout)
             code = response.status_code
             if response.is_redirect:
                 location = urlparse(response.headers.get("location", ""))

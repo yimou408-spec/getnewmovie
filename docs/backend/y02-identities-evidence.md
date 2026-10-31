@@ -72,3 +72,67 @@ Y02 改动先保存为本地提交 `e891591`，随后重新 fetch 并将最新 `
 - 真实模型和豆瓣没有在本轮重新调用；Y02仍是离线实现交付，真实数据出口、独立来源与三方签收待完成。原任务剩余项见[三人任务台账](../三人开发任务台账.md)。
 - 合并后的浏览器离线兼容回归：Chrome桌面/手机、明/暗四组合52/52通过，用时2.1分钟，覆盖S0六状态、0–3部与缺省字段、多平台来源展示、比较证据快照及非法评分引用拒绝。本轮仅运行 `--grep OFFLINE`，不是全量真实上游或模型验收；测试服务进程显式禁用模型配置，无付费模型调用。
 - 本机浏览器报告在忽略路径 `artifacts/merge-main/y02-report/index.html`，截图在 `artifacts/merge-main/y02-screenshots/`；本地路径不是其他协作者可访问的共享证据。远程结果以合入后GitHub Actions为准。
+
+## 2026-10-31：Y03–Y08 后端增量与验收
+
+本轮从主分支 `68ff223` 创建 `feat/backend-persistence-evidence`。范围为原三人计划中可解除联调阻塞的后端持久化、反馈/记忆、证据服务基础和运行约束；不把历史MVP签收扩大为完整多源产品签收。原10月26日“未接入数据库/反馈”保留为历史快照，以本节为准。
+
+### 实现与接口交接
+
+- `app/services/storage.py`：SQLite版本迁移（当前v3）、事务、外键级联、偏好乐观版本、反馈event_id幂等与冲突、受控撤销、过期会话清理、备份及完整性检查；同一外部ID不能归属两个主影片。`create_app(repository=...)`可注入临时数据库，旧`scripts.movie_server`入口保留。
+- `POST /identities`返回一次性匿名Bearer凭据，数据库只存SHA-256摘要。它是本机浏览器能力令牌，不是账号登录、多人认证或跨设备恢复；服务仍只绑定127.0.0.1。`POST /sessions`可绑定该身份。
+- `GET/PUT/DELETE /me/preferences`：写入需`confirmed=true`和`expected_version`，保存支持的明确偏好；排除影片、同行、原始文字不能写长期偏好。删除偏好清空并关闭记忆；`GET/DELETE /me/seen`管理已看；`DELETE /me/data?confirmed=true`删除身份及关联偏好、已看、反馈、会话。旧令牌失效，不从旧上下文恢复。
+- `POST /feedback`：`seen/unseen`为明确确认的长期已看状态；`dismiss/restore`只影响指定会话；`undo`使用`target_event_id`，不覆盖同片的后续修改。每个身份已看、每个会话临时排除上限400，防止超过推荐契约的排除容量。并发重复event_id只写一次；同ID不同payload返回409。接口只存确认ID和动作，不存用户原文。
+- 推荐的双开关：服务端偏好enabled与请求`memory_enabled=true`同时成立才读取长期记录；本次条件覆盖历史，模型明确清空的字段在连续调整中仍保持清空；长期记忆不写回临时条件。已看参与硬排除。保存/删除期间版本变化使旧推荐返回409，不能提交旧状态结果。
+- `app/services/evidence.py`：仅对独立确认的外部映射调用适配器；持久TTL缓存、fresh/stale语义、更新失败保留原采集时间；统一`source_results`输出。来源域名数量不等于独立性，独立publisher组保持来源声明，不从URL臆造。没有使用依据的正文/评分不会存库或发布。当前生产只可显式启用既有豆瓣适配器，没有第二独立源实现。
+- `app/services/budget.py`、`request_limits.py`：同请求共享最多20次HTTP、3次搜索、45秒响应时限；失败请求计数，缓存命中不计，目录/模型/豆瓣/海报共用预算；等待目录锁也受剩余时间限制。无自动重试。超时返回504，阻塞工作线程可能继续到当前底层调用退出，但不能把迟到结果写回图会话/当成成功响应；单次HTTP超时取剩余预算。不是任意Python函数的强制终止机制。
+- `X-Trace-ID`及`X-Upstream-Calls`响应头与脱敏路由日志：只含路由模板、状态、计数、耗时，无Bearer、query、用户文字或外部URL。个人数据接口`Cache-Control: no-store`。JSON/OpenAPI/TS类型均由Pydantic重新生成。
+- 前端偏好页：明确同意后创建匿名身份并启用记忆；保存当前点选、关闭/启用、清空偏好、已看移除及全部数据二次确认删除。候选“确认已看并保存”连接真实反馈API；失败不假报成功。原本次片单、对比、临时隐藏继续保留页面内存语义。逐来源缺失/失败/缓存状态在候选中显示。
+
+### 配置、启动、备份与恢复
+
+默认数据库为忽略路径`artifacts/state/movie.sqlite3`。可在**进程环境**设置`MOVIE_DB_PATH`改为其他绝对路径；该变量和`MOVIE_DOUBAN_LIVE`不自动读取.env。模型配置仍按README从根目录.env读取。依赖没有新增顶层包，复用FastAPI的AnyIO及Python标准库SQLite。
+
+```powershell
+python -m pip install -r requirements-s0.txt
+python -m scripts.backend_admin check
+cd web/app
+npm ci
+npm run build
+cd ../..
+python -m uvicorn scripts.movie_preview:app --host 127.0.0.1 --port 8000
+```
+
+备份输出必须为不存在的新路径，不会覆盖已有备份；数据库和备份含个人记录，保留在Git忽略目录：
+
+```powershell
+python -m scripts.backend_admin backup --output artifacts/backups/movie-20261031.sqlite3
+python -m scripts.backend_admin --database artifacts/backups/movie-20261031.sqlite3 check
+```
+
+恢复时先停止本项目服务，**把`MOVIE_DB_PATH`指向已检查的备份副本**后重新启动，不覆盖原库；先验证偏好/已看隔离和数据版本。备份早于删除操作时会保留历史数据，恢复后须重新执行需保留的删除，不宣称备份具备远程撤销机制。
+
+已独立核验影片身份后，管理员可本机登记映射（不能仅凭同名同年或候选搜索结果执行）：
+
+```powershell
+python -m scripts.backend_admin map --movie-id itunes:实际主ID --provider douban --external-id 实际核验ID --basis human_verified --confirmed
+```
+
+只有存在确认映射，且在启动进程显式设置`$env:MOVIE_DOUBAN_LIVE='1'`，推荐才会发豆瓣请求；该开关不绕过安全验证，也不授予正文存储/发布权限。缺配置/映射显示not_configured；未确认映射显示ambiguous，禁止自动选首条。
+
+### 已执行验证与仍未通过项
+
+- TDD：先添加仓储/API、证据/预算、页面组件测试，分别因待实现模块缺失失败；新增身份隔离、事务幂等、撤销、版本竞争、偏好删除/连续调整、防迟到响应与真实总时限等行为后实现通过。浏览器首轮因测试定位匹配两个status元素失败，改为精确反馈定位后重验通过。
+- 最终开发环境后端166项、前端38项单测通过；Schema/机器规格、构建和格式检查通过。独立`artifacts/backend-venv`安装`requirements-s0.txt`后同样166项通过，`pip check`无损坏依赖。独立环境仍位于同一Windows主机，不代替另一人的环境复现。
+- SQLite重启读取、v1→v2→v3迁移、备份副本完整性和偏好恢复已验证；本地CLI检查/备份/副本检查通过，原数据库未覆盖。临时状态与报告均在忽略目录。
+- Chrome桌面/手机、明/暗四组完整回归228/228通过（10.1分钟），覆盖真实Apple、纯规则自然语言、来源面板、比较、故障恢复，以及明确标注的离线合成契约场景。最后补丁对记忆、连续请求、冲突确认及比较另跑24/24（1.5分钟）。记忆接口实际写临时SQLite；Axe及窄屏无横向溢出通过。历史截图的自动覆盖已恢复；新增[桌面浅色](../frontend/screenshots/backend-20261031/desktop-light-memory.png)与[手机深色](../frontend/screenshots/backend-20261031/mobile-dark-memory.png)只含测试状态，无令牌/个人材料。
+- 首轮完整回归暴露旧断言仍期待记忆不可用、旧health固定行数和真实上游限流。测试现按明确授权按钮和逐能力行检查，限流等待一分钟后仅重试一次，未放宽生产限额。最终复核先用失败测试确认并修复：排除合计超500返回409；证据失败不提交未送达的Agent上下文；请求级评分不污染共享片库；另补旧v1库保留偏好迁移及失效匿名身份重新授权。
+- `python -m scripts.backend_acceptance --live`及最终复验：真实Apple目录3次上游请求、3部候选，偏好硬过滤、已看跨会话排除、反馈幂等、删除/令牌撤销七项检查全部通过。没有模型调用；来源状态not_configured未伪装为多源成功。脱敏报告`artifacts/backend-acceptance/final-live-smoke.json`。
+- 豆瓣显式复测9次请求：3个身份候选、6次安全验证重定向；评分0、短评0、全文0。`TMDB_READ_TOKEN`缺失，TMDB零请求；LLM配置缺失，本轮零付费模型请求。探测报告`artifacts/douban/20261031-development.json`；没有保存原HTML或评论正文。
+- 剩余：豆瓣真实可用评价通路与使用条件、TMDB真实覆盖、第二独立评价源、口碑综合/低剧透真实验收、M11真实模型冲突/失败恢复、另一成员环境复现、P/C独立主审、最终签收与云端CI。不可把本轮工程实现标成原完整多源产品已经验收。
+
+### 本轮验收范围与下次提醒
+
+用户2026-10-31确认“暂时用离线，后续提醒我用真实模型验收”。本轮按离线工程验收交付，既有Apple真实冒烟作为附加证据；不再为本轮等待LLM/TMDB配置，也不把离线模型替身标成真实DeepSeek通过。
+
+下一次继续开发或最终交付前，先提醒用户在本机配置`LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`（不发聊天），再明确运行`python -m scripts.mvp_probe_model --live --case E02 --max-requests 1`，以及同一版本的真实冲突确认、失败恢复、记忆开关/补充/换组与删除验收；记录实际响应模型及脱敏结果。TMDB另需进程变量`TMDB_READ_TOKEN`，豆瓣/第二源仍需真实可用通路。P/C独立评审与另一环境复现保留待办。

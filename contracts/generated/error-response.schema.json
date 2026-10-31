@@ -30,7 +30,13 @@
         "INVALID_SCENARIO",
         "SESSION_EXPIRED",
         "STALE_CLARIFICATION",
-        "INVALID_CLARIFICATION"
+        "INVALID_CLARIFICATION",
+        "IDENTITY_REQUIRED",
+        "IDENTITY_MISMATCH",
+        "VERSION_CONFLICT",
+        "EVENT_CONFLICT",
+        "CONSENT_REQUIRED",
+        "BUDGET_EXHAUSTED"
       ],
       "title": "Code",
       "type": "string"

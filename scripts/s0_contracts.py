@@ -57,6 +57,76 @@ class SessionResponse(StrictModel):
     expires_in_seconds: int
 
 
+class IdentityResponse(StrictModel):
+    identity_token: str
+    token_type: Literal["Bearer"] = "Bearer"
+
+
+class MemoryPreferences(StrictModel):
+    """Explicit long-term preferences; temporary exclusions never belong here."""
+    genres: list[Literal["喜剧", "科幻与奇幻", "惊悚", "动作", "爱情", "动画", "剧情", "家庭", "纪录片", "恐怖"]] = Field(default_factory=list, max_length=10)
+    moods: list[Literal["轻松解压", "温暖治愈", "烧脑过瘾", "浪漫心动", "惊奇冒险", "感动一下"]] = Field(default_factory=list, max_length=6)
+    exclude_genres: list[str] = Field(default_factory=list, max_length=20)
+    preferred_tags: list[str] = Field(default_factory=list, max_length=20)
+    max_runtime_minutes: int | None = Field(default=None, ge=1, le=600)
+    era: Literal["any", "recent", "2000s", "classic"] = "any"
+
+    @model_validator(mode="after")
+    def no_conflict(self):
+        if set(self.genres) & set(self.exclude_genres):
+            raise ValueError("saved included/excluded genres conflict")
+        return self
+
+
+class PreferencesWrite(StrictModel):
+    enabled: bool
+    constraints: MemoryPreferences
+    confirmed: Literal[True]
+    expected_version: int = Field(ge=0)
+
+
+class PreferencesResponse(StrictModel):
+    enabled: bool
+    constraints: Constraints
+    version: int = Field(ge=0)
+
+
+class SeenResponse(StrictModel):
+    movie_ids: list[str]
+    version: int
+
+
+class FeedbackRequest(StrictModel):
+    event_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+    session_id: str = Field(min_length=1, max_length=100)
+    action: Literal["seen", "unseen", "dismiss", "restore", "undo"]
+    movie_id: str | None = Field(default=None, pattern=r"^itunes:[1-9][0-9]*$")
+    target_event_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,100}$")
+    confirmed: bool = False
+
+    @model_validator(mode="after")
+    def check_action(self):
+        if self.action == "undo":
+            if not self.target_event_id or self.movie_id:
+                raise ValueError("undo requires only target_event_id")
+        elif not self.movie_id or self.target_event_id:
+            raise ValueError("feedback requires a movie_id and no undo target")
+        if self.action in {"seen", "unseen"} and not self.confirmed:
+            raise ValueError("long-term seen changes require confirmation")
+        return self
+
+
+class FeedbackResponse(StrictModel):
+    event_id: str
+    version: int
+    action: Literal["seen", "unseen", "dismiss", "restore", "undo"]
+    movie_id: str | None
+
+
+class DeletionResponse(StrictModel):
+    deleted: Literal[True] = True
+
+
 class Interpretation(StrictModel):
     method: Literal["rules-v1", "llm-v1"] = "rules-v1"
     effective_constraints: Constraints
@@ -289,7 +359,7 @@ class ErrorResponse(StrictModel):
     contract_version: Literal["0.1.0"] = VERSION
     trace_id: str
     data_mode: Literal["synthetic", "live", "cached"]
-    code: Literal["UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RATE_LIMIT", "NOT_CONFIGURED", "NOT_FOUND", "INVALID_SCENARIO", "SESSION_EXPIRED", "STALE_CLARIFICATION", "INVALID_CLARIFICATION"]
+    code: Literal["UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RATE_LIMIT", "NOT_CONFIGURED", "NOT_FOUND", "INVALID_SCENARIO", "SESSION_EXPIRED", "STALE_CLARIFICATION", "INVALID_CLARIFICATION", "IDENTITY_REQUIRED", "IDENTITY_MISMATCH", "VERSION_CONFLICT", "EVENT_CONFLICT", "CONSENT_REQUIRED", "BUDGET_EXHAUSTED"]
     message: str
     retryable: bool
 

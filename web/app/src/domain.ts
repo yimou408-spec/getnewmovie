@@ -7,7 +7,11 @@ import type { components } from "./generated/api";
 export type Movie = components["schemas"]["Movie"];
 export type Candidate = components["schemas"]["Candidate"];
 export type Recommendation = components["schemas"]["RecommendationResponse"];
-export type Request = components["schemas"]["RecommendationRequest"];
+type WireRequest = components["schemas"]["RecommendationRequest"];
+// Pydantic applies defaults; current input must preserve omitted-vs-explicit fields.
+export type Request = Omit<WireRequest, "constraints"> & {
+  constraints?: Partial<components["schemas"]["Constraints"]>;
+};
 export type Mode = Request["mode"];
 export type DataMode = Recommendation["data_mode"];
 const ajv = new Ajv({ strict: false });
@@ -54,6 +58,20 @@ export function validateResponse(raw: unknown): Recommendation {
       )
     )
       throw new Error("评分平台与引用来源不一致。");
+  }
+  for (const source of raw.source_results ?? []) {
+    if (!ids.has(source.movie_id))
+      throw new Error("来源状态对应的影片不在本次候选中。");
+    for (const item of source.evidence ?? []) {
+      const shared = evidence.get(item.evidence_id);
+      if (
+        !shared ||
+        shared.movie_id !== source.movie_id ||
+        shared.source !== source.source ||
+        JSON.stringify(shared) !== JSON.stringify(item)
+      )
+        throw new Error("来源结果与共享证据不一致。");
+    }
   }
   return raw;
 }

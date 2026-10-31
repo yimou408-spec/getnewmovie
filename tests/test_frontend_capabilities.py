@@ -25,6 +25,6 @@ def test_health_declares_metadata_separately_from_reputation_without_network():
         "reviews": False,
         "natural_language": True,
         "model_understanding": False,
-        "long_term_memory": False,
+        "long_term_memory": True,
         "local_availability": False,
     }

@@ -21,6 +21,94 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/identities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create Identity */
+    post: operations["create_identity_identities_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/preferences": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Preferences */
+    get: operations["preferences_me_preferences_get"];
+    /** Save Preferences */
+    put: operations["save_preferences_me_preferences_put"];
+    post?: never;
+    /** Clear Preferences */
+    delete: operations["clear_preferences_me_preferences_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/seen": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Seen */
+    get: operations["seen_me_seen_get"];
+    put?: never;
+    post?: never;
+    /** Clear Seen */
+    delete: operations["clear_seen_me_seen_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/me/data": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Clear Data */
+    delete: operations["clear_data_me_data_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/feedback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Feedback */
+    post: operations["feedback_feedback_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/health": {
     parameters: {
       query?: never;
@@ -214,6 +302,15 @@ export interface components {
        */
       era: "any" | "recent" | "2000s" | "classic";
     };
+    /** DeletionResponse */
+    DeletionResponse: {
+      /**
+       * Deleted
+       * @default true
+       * @constant
+       */
+      deleted: true;
+    };
     /** ErrorResponse */
     ErrorResponse: {
       /**
@@ -242,7 +339,13 @@ export interface components {
         | "INVALID_SCENARIO"
         | "SESSION_EXPIRED"
         | "STALE_CLARIFICATION"
-        | "INVALID_CLARIFICATION";
+        | "INVALID_CLARIFICATION"
+        | "IDENTITY_REQUIRED"
+        | "IDENTITY_MISMATCH"
+        | "VERSION_CONFLICT"
+        | "EVENT_CONFLICT"
+        | "CONSENT_REQUIRED"
+        | "BUDGET_EXHAUSTED";
       /** Message */
       message: string;
       /** Retryable */
@@ -312,6 +415,41 @@ export interface components {
        */
       basis: "title_year" | "human_verified" | "provider_mapping";
     };
+    /** FeedbackRequest */
+    FeedbackRequest: {
+      /** Event Id */
+      event_id: string;
+      /** Session Id */
+      session_id: string;
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: "seen" | "unseen" | "dismiss" | "restore" | "undo";
+      /** Movie Id */
+      movie_id?: string | null;
+      /** Target Event Id */
+      target_event_id?: string | null;
+      /**
+       * Confirmed
+       * @default false
+       */
+      confirmed: boolean;
+    };
+    /** FeedbackResponse */
+    FeedbackResponse: {
+      /** Event Id */
+      event_id: string;
+      /** Version */
+      version: number;
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: "seen" | "unseen" | "dismiss" | "restore" | "undo";
+      /** Movie Id */
+      movie_id: string | null;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -328,6 +466,17 @@ export interface components {
       /** Cache Ttl Seconds */
       cache_ttl_seconds: number;
       capabilities?: components["schemas"]["ServiceCapabilities"] | null;
+    };
+    /** IdentityResponse */
+    IdentityResponse: {
+      /** Identity Token */
+      identity_token: string;
+      /**
+       * Token Type
+       * @default Bearer
+       * @constant
+       */
+      token_type: "Bearer";
     };
     /** Interpretation */
     Interpretation: {
@@ -346,6 +495,46 @@ export interface components {
       conflicts?: string[];
       /** Unhandled */
       unhandled?: string[];
+    };
+    /**
+     * MemoryPreferences
+     * @description Explicit long-term preferences; temporary exclusions never belong here.
+     */
+    MemoryPreferences: {
+      /** Genres */
+      genres?: (
+        | "喜剧"
+        | "科幻与奇幻"
+        | "惊悚"
+        | "动作"
+        | "爱情"
+        | "动画"
+        | "剧情"
+        | "家庭"
+        | "纪录片"
+        | "恐怖"
+      )[];
+      /** Moods */
+      moods?: (
+        | "轻松解压"
+        | "温暖治愈"
+        | "烧脑过瘾"
+        | "浪漫心动"
+        | "惊奇冒险"
+        | "感动一下"
+      )[];
+      /** Exclude Genres */
+      exclude_genres?: string[];
+      /** Preferred Tags */
+      preferred_tags?: string[];
+      /** Max Runtime Minutes */
+      max_runtime_minutes?: number | null;
+      /**
+       * Era
+       * @default any
+       * @enum {string}
+       */
+      era: "any" | "recent" | "2000s" | "classic";
     };
     /** Movie */
     Movie: {
@@ -387,6 +576,27 @@ export interface components {
       movies: components["schemas"]["Movie"][];
       /** Requires Confirmation */
       requires_confirmation: boolean;
+    };
+    /** PreferencesResponse */
+    PreferencesResponse: {
+      /** Enabled */
+      enabled: boolean;
+      constraints: components["schemas"]["Constraints"];
+      /** Version */
+      version: number;
+    };
+    /** PreferencesWrite */
+    PreferencesWrite: {
+      /** Enabled */
+      enabled: boolean;
+      constraints: components["schemas"]["MemoryPreferences"];
+      /**
+       * Confirmed
+       * @constant
+       */
+      confirmed: true;
+      /** Expected Version */
+      expected_version: number;
     };
     /** Question */
     Question: {
@@ -501,6 +711,13 @@ export interface components {
       /** Source Results */
       source_results?: components["schemas"]["SourceEvidenceResult"][] | null;
     };
+    /** SeenResponse */
+    SeenResponse: {
+      /** Movie Ids */
+      movie_ids: string[];
+      /** Version */
+      version: number;
+    };
     /**
      * ServiceCapabilities
      * @description Implemented paths only, not a claim of upstream availability or quality.
@@ -610,7 +827,9 @@ export interface operations {
   create_session_sessions_post: {
     parameters: {
       query?: never;
-      header?: never;
+      header?: {
+        authorization?: string | null;
+      };
       path?: never;
       cookie?: never;
     };
@@ -623,6 +842,267 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SessionResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_identity_identities_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IdentityResponse"];
+        };
+      };
+    };
+  };
+  preferences_me_preferences_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PreferencesResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_preferences_me_preferences_put: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PreferencesWrite"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PreferencesResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  clear_preferences_me_preferences_delete: {
+    parameters: {
+      query: {
+        expected_version: number;
+        confirmed?: boolean;
+      };
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PreferencesResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  seen_me_seen_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeenResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  clear_seen_me_seen_delete: {
+    parameters: {
+      query?: {
+        confirmed?: boolean;
+      };
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SeenResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  clear_data_me_data_delete: {
+    parameters: {
+      query?: {
+        confirmed?: boolean;
+      };
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeletionResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  feedback_feedback_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FeedbackRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FeedbackResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -650,7 +1130,9 @@ export interface operations {
   recommendations_recommendations_post: {
     parameters: {
       query?: never;
-      header?: never;
+      header?: {
+        authorization?: string | null;
+      };
       path?: never;
       cookie?: never;
     };

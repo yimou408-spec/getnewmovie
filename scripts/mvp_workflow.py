@@ -12,6 +12,7 @@ from scripts.movie_catalog import CatalogError, MOODS
 from scripts.mvp_intent_contracts import IntentDecision, TurnContext
 from scripts.mvp_recommendation_rules import merge_conditions, select_movies
 from scripts.s0_contracts import Constraints, Question, RecommendationRequest
+from app.services.budget import catalog_lock
 
 
 @dataclass
@@ -23,6 +24,7 @@ class PendingConfirmation:
     constraints: Constraints
     unhandled: list
     method: str
+    explicit_fields: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -33,6 +35,7 @@ class AgentContext:
     method: str = "rules-v1"
     pending: PendingConfirmation | None = None
     reroll_excluded: list[str] = field(default_factory=list)
+    explicit_fields: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -52,6 +55,8 @@ class WorkflowResult:
 
 
 class GraphState(TypedDict, total=False):
+    constraints_resolver: object
+    explicit_fields: list[str]
     body: RecommendationRequest
     context: AgentContext
     intent: IntentDecision
@@ -81,9 +86,9 @@ class AgentWorkflow:
         graph.add_edge("catalog", END)
         self.graph = graph.compile()
 
-    def run(self, body, context=None):
+    def run(self, body, context=None, *, constraints_resolver=None):
         state = self.graph.invoke({"body": body, "context": context or AgentContext(),
-                                   "deadline": time.monotonic() + 60}, {"recursion_limit": 8})
+                                   "deadline": time.monotonic() + 60, "constraints_resolver": constraints_resolver}, {"recursion_limit": 8})
         return state["result"]
 
     def _error(self, state, code):
@@ -102,7 +107,7 @@ class AgentWorkflow:
                 return self._error(state, "INVALID_CLARIFICATION")
             constraints = pending.alternatives.get(answers.get("conflict"), pending.constraints)
             return {"constraints": constraints, "confirmed": True, "method": pending.method,
-                    "unhandled": pending.unhandled, "intent": IntentDecision()}
+                    "unhandled": pending.unhandled, "intent": IntentDecision(), "explicit_fields": pending.explicit_fields}
         query = body.query.strip()
         if query in ("重新开始", "清空选片条件"):
             return {"intent": IntentDecision(action="reset"), "method": "rules-v1"}
@@ -135,8 +140,11 @@ class AgentWorkflow:
         resolution = merge_conditions(intent, previous=previous,
                                       selected=selected, displayed=context.displayed)
         constraints = resolution.constraints
+        previous_fields = context.explicit_fields if intent.action in {"refine", "reroll"} else []
+        explicit_fields = list(dict.fromkeys([*previous_fields, *intent.updates.model_fields_set,
+                                             *body.constraints.model_dump(exclude_defaults=True)]))
         if not resolution.needs_confirmation:
-            return {"constraints": constraints, "unhandled": []}
+            return {"constraints": constraints, "unhandled": [], "explicit_fields": explicit_fields}
         questions, alternatives = [], {}
         if resolution.conflicts:
             overlap = set(constraints.genres) & set(constraints.exclude_genres)
@@ -154,7 +162,7 @@ class AgentWorkflow:
         if resolution.unhandled:
             questions.append(Question(question_id="unhandled", text="暂时无法执行：" + "；".join(resolution.unhandled) + "。要仅按已识别条件继续吗？", options=["仅按已识别条件继续"]))
         pending = PendingConfirmation(uuid4().hex, fingerprint(body), questions, alternatives, constraints,
-                                      resolution.unhandled, state["method"])
+                                      resolution.unhandled, state["method"], explicit_fields)
         next_context = replace(context, pending=pending)
         result = WorkflowResult("needs_clarification", constraints, next_context, method=state["method"],
                                 questions=questions, clarification_id=pending.token,
@@ -165,8 +173,11 @@ class AgentWorkflow:
         if time.monotonic() > state["deadline"]:
             return self._error(state, "WORKFLOW_TIMEOUT")
         body, context, constraints = state["body"], state["context"], state["constraints"]
+        current_constraints = constraints
+        if state.get("constraints_resolver"):
+            constraints = state["constraints_resolver"](constraints, explicit=state.get("explicit_fields", []))
         # LLM calls finish before this lock; reuse provider caching and rate limits.
-        with self.catalog.lock:
+        with catalog_lock(self.catalog.lock):
             if body.mode in ("known_movie", "watchlist"):
                 ids = [body.movie_id] if body.mode == "known_movie" else list(dict.fromkeys(body.watchlist_movie_ids))
                 if any(not mid.startswith("itunes:") for mid in ids):
@@ -183,9 +194,10 @@ class AgentWorkflow:
         reroll_excluded = [] if state["intent"].action == "reset" else list(context.reroll_excluded)
         if state["intent"].action == "reroll":
             reroll_excluded = list(dict.fromkeys([*reroll_excluded, *context.displayed]))
-        next_context = AgentContext(constraints.model_copy(deep=True),
+        next_context = AgentContext(current_constraints.model_copy(deep=True),
                                     list(dict.fromkeys([*displayed, *(m.movie_id for m, at in selection.candidates)])),
-                                    True, state["method"], reroll_excluded=reroll_excluded)
+                                    True, state["method"], reroll_excluded=reroll_excluded,
+                                    explicit_fields=state.get("explicit_fields", []))
         return {"result": WorkflowResult("ready" if selection.candidates else "empty", constraints, next_context,
                                          method=state["method"], candidates=selection.candidates,
                                          catalog_size=len(rows), matched_count=len(selection.eligible),

@@ -17,6 +17,8 @@ from pydantic import HttpUrl
 
 from scripts.s0_contracts import Movie
 from scripts.movie_ranking import content_clues
+from scripts.movie_catalog_errors import CatalogError
+from app.services.budget import consume, current_budget
 
 GENRES = {"喜剧": "4404", "科幻与奇幻": "4413", "惊悚": "4416", "动作": "4401",
           "爱情": "4412", "动画": "4402", "剧情": "4406", "家庭": "4410", "纪录片": "4405", "恐怖": "4408"}
@@ -28,11 +30,6 @@ MOODS = {"轻松解压": {"喜剧", "家庭"}, "温暖治愈": {"家庭", "动�
 
 def stamp():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-class CatalogError(Exception):
-    def __init__(self, code="UPSTREAM_UNAVAILABLE", message="电影资料源暂时不可用，请稍后重试。", status=503):
-        self.code, self.message, self.status = code, message, status
 
 
 def apple_url(value, artwork=False):
@@ -66,8 +63,11 @@ class AppleCatalog:
         if len(self.calls) >= self.rate_limit:
             raise CatalogError("UPSTREAM_RATE_LIMIT", "资料源请求较多，请一分钟后重试；已有结果仍可查看。")
         self.calls.append(now)
+        timeout = consume(search=path == "/search")
         try:
-            response = self.client.get("https://itunes.apple.com" + path, params=params)
+            response = self.client.get("https://itunes.apple.com" + path, params=params, timeout=timeout)
+            if current_budget.get():
+                current_budget.get().check()
             if response.status_code == 429:
                 raise CatalogError("UPSTREAM_RATE_LIMIT", "资料源暂时限流，请一分钟后重试。")
             response.raise_for_status()

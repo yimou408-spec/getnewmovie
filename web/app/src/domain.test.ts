@@ -59,4 +59,19 @@ describe("truthful contract boundary", () => {
       buildRequest("watchlist", "   ", "CN", "", [movie.movie_id]).query,
     ).toBeTruthy();
   });
+  it("rejects source results that disagree with top-level movie evidence", () => {
+    const data = structuredClone(success) as unknown as Record<string, unknown>;
+    data.source_results = [
+      {
+        movie_id: "syn:not-returned",
+        source: "Douban",
+        status: "timeout",
+        evidence: [],
+        ratings: [],
+        warnings: [],
+        cache_status: "none",
+      },
+    ];
+    expect(() => validateResponse(data)).toThrow();
+  });
 });

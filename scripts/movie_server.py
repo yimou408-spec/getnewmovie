@@ -5,10 +5,13 @@ from threading import Lock
 from urllib.parse import urlparse
 import re
 import time
+import os
+from pathlib import Path
+import anyio
 
 import httpx
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, Depends, Header
 from fastapi.responses import JSONResponse, Response
 
 from scripts.movie_catalog import AppleCatalog, CatalogError, MOODS
@@ -17,36 +20,106 @@ from scripts.mvp_recommendation_rules import MovieSelection, select_movies
 from scripts.mvp_model import ModelAdapter, ModelSettings
 from scripts.mvp_workflow import AgentContext, AgentWorkflow
 from scripts.movie_intent import IntentSessions, explain
+from app.services.storage import Repository, StoreError
+from app.services.memory import apply_memory, bounded_exclusions
+from app.services.evidence import EvidenceService
+from app.services.request_limits import RequestLimits
+from app.services.budget import RequestBudget, catalog_lock, consume, current_budget
 from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
-                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities, SessionResponse)
+                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities, SessionResponse,
+                                  IdentityResponse, PreferencesWrite, PreferencesResponse, SeenResponse,
+                                  FeedbackRequest, FeedbackResponse, DeletionResponse)
 
 
-def create_app(catalog=None, *, model_factory=None):
+def create_app(catalog=None, *, model_factory=None, repository=None, evidence_service=None, budget_factory=RequestBudget):
+    production = catalog is None
     if catalog is None and model_factory is None:
         settings = ModelSettings.from_env()
         if settings is not None:
             model_factory = lambda: ModelAdapter(settings, max_requests=1)
     catalog = catalog or AppleCatalog()
+    repository = repository or Repository((os.getenv("MOVIE_DB_PATH") or Path(__file__).resolve().parents[1] / "artifacts/state/movie.sqlite3") if production else ":memory:")
+    if evidence_service is None:
+        from app.services.evidence import configured_adapters
+        evidence_service = EvidenceService(repository, configured_adapters() if production else {})
     sessions = IntentSessions()
     agent_contexts = {}
     workflow = AgentWorkflow(catalog, model_factory) if model_factory else None
     artwork_cache = OrderedDict()
     artwork_lock = Lock()
     app = FastAPI(title="Tonight movie catalog", version="0.1.0", description="Apple US real charts. Rule-based matching, no synthetic fallback.")
+    app.state.repository = repository
+
+    app.add_middleware(RequestLimits, budget_factory=budget_factory)
+
+    def optional_owner(authorization: str | None = Header(default=None)):
+        if authorization is None:
+            return None
+        if not authorization.startswith("Bearer ") or len(authorization) > 200:
+            raise StoreError("IDENTITY_REQUIRED", "需要有效的匿名身份。", 401)
+        return repository.authenticate(authorization[7:])
+
+    def required_owner(owner=Depends(optional_owner)):
+        if owner is None:
+            raise StoreError("IDENTITY_REQUIRED", "请先建立匿名身份。", 401)
+        return owner
 
     @app.exception_handler(CatalogError)
     async def source_error(request: Request, exc: CatalogError):
-        return JSONResponse(status_code=exc.status, content=ErrorResponse(trace_id=uuid4().hex, data_mode="live",
+        return JSONResponse(status_code=exc.status, content=ErrorResponse(trace_id=getattr(request.state, "trace_id", uuid4().hex), data_mode="live",
             code=exc.code, message=exc.message, retryable=exc.status >= 500).model_dump(mode="json"))
 
     @app.post("/sessions", response_model=SessionResponse)
-    def create_session():
-        return SessionResponse(session_id=sessions.create(), expires_in_seconds=sessions.ttl)
+    def create_session(owner=Depends(optional_owner)):
+        sid = sessions.create()
+        repository.create_session(sid, owner, sessions.ttl)
+        return SessionResponse(session_id=sid, expires_in_seconds=sessions.ttl)
+
+    @app.post("/identities", response_model=IdentityResponse)
+    def create_identity():
+        token, _ = repository.create_identity()
+        return IdentityResponse(identity_token=token)
+
+    @app.get("/me/preferences", response_model=PreferencesResponse)
+    def preferences(owner=Depends(required_owner)):
+        return repository.preferences(owner)
+
+    @app.put("/me/preferences", response_model=PreferencesResponse)
+    def save_preferences(body: PreferencesWrite, owner=Depends(required_owner)):
+        return repository.save_preferences(owner, body.constraints.model_dump(), enabled=body.enabled, expected_version=body.expected_version)
+
+    @app.delete("/me/preferences", response_model=PreferencesResponse)
+    def clear_preferences(expected_version: int = Query(ge=0), confirmed: bool = Query(False), owner=Depends(required_owner)):
+        if not confirmed:
+            raise StoreError("CONSENT_REQUIRED", "删除长期偏好需要明确确认。", 422)
+        return repository.save_preferences(owner, {}, enabled=False, expected_version=expected_version)
+
+    @app.get("/me/seen", response_model=SeenResponse)
+    def seen(owner=Depends(required_owner)):
+        return SeenResponse(movie_ids=repository.seen(owner), version=repository.preferences(owner)["version"])
+
+    @app.delete("/me/seen", response_model=SeenResponse)
+    def clear_seen(confirmed: bool = Query(False), owner=Depends(required_owner)):
+        if not confirmed:
+            raise StoreError("CONSENT_REQUIRED", "清空已看记录需要明确确认。", 422)
+        repository.delete_seen(owner)
+        return seen(owner)
+
+    @app.delete("/me/data", response_model=DeletionResponse)
+    def clear_data(confirmed: bool = Query(False), owner=Depends(required_owner)):
+        if not confirmed:
+            raise StoreError("CONSENT_REQUIRED", "删除全部个人数据需要明确确认。", 422)
+        repository.delete_identity(owner)
+        return DeletionResponse()
+
+    @app.post("/feedback", response_model=FeedbackResponse)
+    def feedback(body: FeedbackRequest, owner=Depends(required_owner)):
+        return repository.feedback(owner, body.model_dump(exclude_none=True))
 
     @app.get("/health", response_model=HealthResponse)
     def health():
         return HealthResponse(service="real-catalog", provider="Apple iTunes US", synthetic_fallback=False,
-                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, natural_language=True,
+                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, natural_language=True, long_term_memory=True,
                                                                                       model_understanding=workflow is not None))
 
     def find(mid):
@@ -58,9 +131,12 @@ def create_app(catalog=None, *, model_factory=None):
         return found[0]
 
     @app.get("/artwork/{movie_id}", include_in_schema=False)
-    def artwork(movie_id: str):
+    async def artwork(movie_id: str):
+        return await anyio.to_thread.run_sync(artwork_impl, movie_id, abandon_on_cancel=True)
+
+    def artwork_impl(movie_id):
         # Only catalog-owned IDs can resolve artwork; callers never supply a URL.
-        with catalog.lock:
+        with catalog_lock(catalog.lock):
             film, _ = find(movie_id)
         url = str(film.poster_url or "")
         parsed = urlparse(url)
@@ -78,12 +154,14 @@ def create_app(catalog=None, *, model_factory=None):
                 artwork_cache.move_to_end(url)
                 return Response(cached[1], media_type=cached[2], headers=headers)
         try:
-            with catalog.client.stream("GET", url, timeout=10, follow_redirects=False) as upstream:
+            with catalog.client.stream("GET", url, timeout=consume(), follow_redirects=False) as upstream:
                 media_type = upstream.headers.get("content-type", "").split(";")[0]
                 if upstream.status_code != 200 or media_type not in ("image/jpeg", "image/png", "image/webp"):
                     raise CatalogError("UPSTREAM_UNAVAILABLE", "海报源暂时不可用，请稍后重试。", 503)
                 content = bytearray()
                 for chunk in upstream.iter_bytes():
+                    if current_budget.get():
+                        current_budget.get().check()
                     content.extend(chunk)
                     if len(content) > 2 * 1024 * 1024:
                         raise CatalogError("UPSTREAM_UNAVAILABLE", "海报文件过大，暂时无法展示。", 503)
@@ -100,7 +178,47 @@ def create_app(catalog=None, *, model_factory=None):
         return Response(data, media_type=media_type, headers=headers)
 
     @app.post("/recommendations", response_model=RecommendationResponse, responses={503: {"model": ErrorResponse}, 504: {"model": ErrorResponse}})
-    def recommendations(body: RecommendationRequest):
+    async def recommendations(body: RecommendationRequest, request: Request, owner=Depends(optional_owner)):
+        result = await anyio.to_thread.run_sync(recommendations_impl, body, owner, abandon_on_cancel=True)
+        result.trace_id = request.state.trace_id
+        return result
+
+    def recommendations_impl(body, owner):
+        if body.memory_enabled and owner is None:
+            raise StoreError("IDENTITY_REQUIRED", "读取长期记忆需要匿名身份和明确启用。", 401)
+        # Legacy structured callers may use a local label; issued tokens are bound.
+        issued = re.fullmatch(r"[a-f0-9]{32}", body.session_id) is not None
+        if issued or owner or body.memory_enabled:
+            entry = repository.session(body.session_id, owner)
+            with sessions.lock:
+                if body.session_id not in sessions.sessions:
+                    remaining = entry["expires_at"] - repository.clock()
+                    sessions.sessions[body.session_id] = (sessions.clock() + remaining, None)
+        owner_preferences = repository.preferences(owner) if owner else None
+        saved = owner_preferences if body.memory_enabled else None
+        memory_version = owner_preferences["version"] if owner_preferences else None
+        memory_used = bool(saved and saved["enabled"])
+        seen_ids = repository.seen(owner) if memory_used else []
+        dismissed = repository.dismissed(owner, body.session_id) if issued else []
+
+        def resolve_constraints(current, explicit=()):
+            effective = apply_memory(current, saved["constraints"], seen_ids,
+                                     explicit=body.constraints.model_fields_set if body.input_source == "structured" else explicit) if memory_used else current.model_copy(deep=True)
+            effective.exclude_movie_ids = bounded_exclusions(effective.exclude_movie_ids, dismissed)
+            return effective
+
+        def commit_context(result):
+            if current_budget.get():
+                current_budget.get().check()
+            if owner and repository.preferences(owner)["version"] != memory_version:
+                raise StoreError("VERSION_CONFLICT", "记忆或反馈已变化，请重新推荐。", 409)
+            if result is not None and body.input_source == "natural_language":
+                with sessions.lock:
+                    entry = sessions.sessions.get(body.session_id)
+                    if not entry or entry[0] <= sessions.clock():
+                        raise StoreError("SESSION_EXPIRED", "本次会话已过期，请重新开始。", 409)
+                    agent_contexts[body.session_id] = result.context
+
         agent_result = None
         workflow_before = catalog.fetch_count
         if workflow is not None and body.mode == "discover":
@@ -114,7 +232,7 @@ def create_app(catalog=None, *, model_factory=None):
                     if body.session_id not in valid_ids:
                         raise CatalogError("SESSION_EXPIRED", "临时会话已过期，请重新提交观影想法。", 409)
                     context = agent_contexts.get(body.session_id, AgentContext())
-            agent_result = workflow.run(body, context)
+            agent_result = workflow.run(body, context, constraints_resolver=resolve_constraints)
             if agent_result.status == "error":
                 code = agent_result.error_code
                 if code in ("STALE_CLARIFICATION", "INVALID_CLARIFICATION"):
@@ -122,9 +240,6 @@ def create_app(catalog=None, *, model_factory=None):
                 timeout = code in ("MODEL_TIMEOUT", "WORKFLOW_TIMEOUT")
                 raise CatalogError("UPSTREAM_TIMEOUT" if timeout else "UPSTREAM_UNAVAILABLE",
                                    "模型理解暂时未完成，请重试；原有结果仍保留。", 504 if timeout else 503)
-            if body.input_source == "natural_language":
-                with sessions.lock:
-                    agent_contexts[body.session_id] = agent_result.context
             interpretation = explain(agent_result.constraints, method=agent_result.method,
                                      conflicts=agent_result.conflicts, unhandled=agent_result.unhandled)
             clarification_id, questions = agent_result.clarification_id, agent_result.questions
@@ -132,10 +247,16 @@ def create_app(catalog=None, *, model_factory=None):
             interpretation, clarification_id, questions = (sessions.resolve(body) if body.input_source == "natural_language"
                                                            else (explain(body.constraints), None, []))
         if questions:
+            commit_context(agent_result)
             return RecommendationResponse(trace_id=uuid4().hex, data_mode="live", status="needs_clarification",
                 candidates=[], evidence=[], questions=questions, warnings=["尚未查询片库。请确认冲突或无法执行的要求，也可以修改输入重新提交。"],
                 memory_used=False, interpretation=interpretation, clarification_id=clarification_id)
-        with catalog.lock:
+        if agent_result is None:
+            interpretation = explain(resolve_constraints(interpretation.effective_constraints), method=interpretation.method,
+                                     conflicts=interpretation.conflicts, unhandled=interpretation.unhandled)
+        if owner and repository.preferences(owner)["version"] != memory_version:
+            raise StoreError("VERSION_CONFLICT", "记忆或反馈已变化，请重新推荐。", 409)
+        with catalog_lock(catalog.lock):
             before = workflow_before if agent_result is not None else catalog.fetch_count
             c = interpretation.effective_constraints
             mood_genres = set().union(*(MOODS[m] for m in c.moods)) if c.moods else set()
@@ -148,6 +269,8 @@ def create_app(catalog=None, *, model_factory=None):
                 films = [find(mid) for mid in dict.fromkeys(body.watchlist_movie_ids)]
             else:
                 films = catalog.pool(pool_genres)
+            if current_budget.get():
+                current_budget.get().check()
             selection = MovieSelection(films, films) if agent_result is not None else select_movies(films, c)
             eligible = selection.eligible
             candidates, evidence = [], []
@@ -173,7 +296,7 @@ def create_app(catalog=None, *, model_factory=None):
                     caveats.append(f"简介词法提示：{'、'.join(sorted(risks))}，不等于完整内容预警。")
                 if c.company == "和家人":
                     caveats.append(f"美国分级 {movie.content_advisory or '未知'}，不是中国适龄结论；请自行核对。")
-                candidates.append(Candidate(movie=movie, reason=Reason(text="".join(match), evidence_ids=[eid], kind="matching_inference"),
+                candidates.append(Candidate(movie=movie.model_copy(deep=True), reason=Reason(text="".join(match), evidence_ids=[eid], kind="matching_inference"),
                     caveats=caveats,
                     availability=[Availability(region=body.region, status="unknown")]))
             warnings = ["范围：Apple 美国区当前分类榜单；片名沿用来源原文。评分及所选地区播放渠道未接入。",
@@ -190,26 +313,58 @@ def create_app(catalog=None, *, model_factory=None):
             if not eligible:
                 total = agent_result.catalog_size if agent_result is not None else len(films)
                 warnings.insert(0, f"当前查得的 {total} 部影片没有符合全部条件的结果。请放宽时长、年代或类型条件；不会用样例补齐。")
-            return RecommendationResponse(trace_id=uuid4().hex, data_mode="cached" if before == catalog.fetch_count else "live", status="ready" if candidates else "empty",
-                candidates=candidates, evidence=evidence, questions=[], warnings=warnings, memory_used=False,
+            response = RecommendationResponse(trace_id=uuid4().hex, data_mode="cached" if before == catalog.fetch_count else "live", status="ready" if candidates else "empty",
+                candidates=candidates, evidence=evidence, questions=[], warnings=warnings, memory_used=memory_used,
                 catalog_size=agent_result.catalog_size if agent_result is not None else len(films),
                 matched_count=agent_result.matched_count if agent_result is not None else len(eligible), interpretation=interpretation)
+        source_results = []
+        for candidate in response.candidates:
+            results = evidence_service.collect(candidate.movie)
+            source_results.extend(results)
+            for result in results:
+                # Unverified use permissions never publish acquired review text.
+                permitted = [e for e in result.evidence if e.usage_basis in {"licensed", "provider_terms", "synthetic"}]
+                result.evidence = permitted
+                safe_ids = {e.evidence_id for e in permitted if e.spoiler_level == "safe"}
+                result.ratings = [rating for rating in result.ratings if rating.evidence_id in safe_ids]
+                response.evidence.extend(permitted)
+                if result.status == "ok" and result.cache_status != "stale":
+                    candidate.movie.ratings.extend(result.ratings)
+                if result.status not in {"ok", "no_results"}:
+                    response.warnings.append(f"{candidate.movie.title} · {result.source}：{result.status}。")
+        response.source_results = source_results
+        if owner:
+            repository.authenticate_authorized_owner(owner)
+            if repository.preferences(owner)["version"] != memory_version:
+                raise StoreError("VERSION_CONFLICT", "记忆或反馈已变化，请重新推荐。", 409)
+        response = RecommendationResponse.model_validate(response.model_dump())
+        commit_context(agent_result)
+        return response
 
     @app.get("/movies", response_model=MovieSearchResponse)
-    def movies(query: str = Query(min_length=1, max_length=100), year: int | None = None):
-        with catalog.lock:
+    async def movies(query: str = Query(min_length=1, max_length=100), year: int | None = None):
+        return await anyio.to_thread.run_sync(movies_impl, query, year, abandon_on_cancel=True)
+
+    def movies_impl(query, year):
+        with catalog_lock(catalog.lock):
             before = catalog.fetch_count
             found = catalog.search(query.strip(), year)
             return MovieSearchResponse(data_mode="cached" if before == catalog.fetch_count else "live", movies=[m for m, at in found], requires_confirmation=len(found)>1)
 
     @app.get("/movies/{movie_id}", response_model=Movie, responses={404: {"model": ErrorResponse}})
-    def movie(movie_id: str):
-        with catalog.lock:
+    async def movie(movie_id: str):
+        return await anyio.to_thread.run_sync(movie_impl, movie_id, abandon_on_cancel=True)
+
+    def movie_impl(movie_id):
+        with catalog_lock(catalog.lock):
             return find(movie_id)[0]
 
     @app.post("/comparisons", response_model=MovieSearchResponse)
-    def comparisons(body: ComparisonRequest):
-        with catalog.lock:
+    async def comparisons(body: ComparisonRequest):
+        return await anyio.to_thread.run_sync(comparisons_impl, body, abandon_on_cancel=True)
+
+    def comparisons_impl(body):
+        with catalog_lock(catalog.lock):
             before = catalog.fetch_count
             found = [find(mid)[0] for mid in body.movie_ids]
             return MovieSearchResponse(data_mode="cached" if before == catalog.fetch_count else "live", movies=found, requires_confirmation=False)

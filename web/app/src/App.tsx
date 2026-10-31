@@ -60,6 +60,13 @@ import { ErrorNotice } from "./request-feedback";
 import { ServiceStatus } from "./service-status";
 import { EvidencePanel, Ratings, SourceOpinions } from "./evidence";
 import {
+  identityHeaders,
+  identityToken,
+  MemorySettings,
+  sendFeedback,
+  type SavedChoices,
+} from "./memory";
+import {
   reasonLabels,
   snapshotForComparison,
   type ComparedMovie,
@@ -352,6 +359,12 @@ function SourceLink({
 }
 
 export default function App() {
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
+  const [hasIdentity, setHasIdentity] = useState(() =>
+    Boolean(identityToken()),
+  );
+  const [feedbackBusy, setFeedbackBusy] = useState<string>();
+  const feedbackEvents = useRef(new Map<string, string>());
   const [mode, setMode] = useState<Mode>("discover");
   const [drafts, setDrafts] = useState(initialDrafts);
   const [preferences, setPreferences] =
@@ -395,30 +408,63 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!identityToken()) return;
+    let active = true;
+    void api<{ enabled: boolean }>("/me/preferences", {
+      headers: identityHeaders(),
+    })
+      .then((saved) => {
+        if (active) setMemoryEnabled(saved.enabled);
+      })
+      .catch(() => {
+        if (active) setMemoryEnabled(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  function memoryChanged(enabled: boolean) {
+    setMemoryEnabled(enabled);
+    setHasIdentity(Boolean(identityToken()));
+    sessionId.current = undefined;
+    setClarificationStale(true);
+    setAnswers({});
+  }
   const [pathKey, setPathKey] = useState(location.pathname);
   const opening = useQuery({
-    queryKey: ["opening-selection", region],
+    queryKey: ["opening-selection", region, memoryEnabled],
     enabled: location.pathname === "/" && !submittedResult,
     staleTime: 1800000,
     retry: false,
     refetchOnWindowFocus: false,
     // Cache-owned reads survive subscriber remounts without duplicate requests.
     // Explicit cancelQueries still discards their late result.
-    queryFn: async () =>
-      validateResponse(
+    queryFn: async () => {
+      const body = buildRequest(
+        "discover",
+        discoverQuery(emptyPreferences, ""),
+        region,
+        "",
+        [],
+      );
+      if (identityToken()) {
+        const session = await api<{ session_id: string }>("/sessions", {
+          method: "POST",
+          headers: identityHeaders(),
+        });
+        body.session_id = session.session_id;
+        body.constraints = {};
+        body.memory_enabled = memoryEnabled;
+      }
+      return validateResponse(
         await api("/recommendations", {
           method: "POST",
-          body: JSON.stringify(
-            buildRequest(
-              "discover",
-              discoverQuery(emptyPreferences, ""),
-              region,
-              "",
-              [],
-            ),
-          ),
+          headers: identityHeaders(),
+          body: JSON.stringify(body),
         }),
-      ),
+      );
+    },
   });
   const result = submittedResult ?? opening.data;
   useEffect(() => {
@@ -449,10 +495,11 @@ export default function App() {
       body: ReturnType<typeof buildRequest>;
       controller: AbortController;
     }) => {
-      if (body.input_source === "natural_language") {
+      if (body.input_source === "natural_language" || identityToken()) {
         if (!sessionId.current) {
           const session = await api<{ session_id: string }>("/sessions", {
             method: "POST",
+            headers: identityHeaders(),
             signal: controller.signal,
           });
           if (!/^[a-f0-9]{32}$/.test(session.session_id))
@@ -470,10 +517,29 @@ export default function App() {
         }
         body = { ...body, session_id: sessionId.current ?? "" };
       }
+      body = { ...body, memory_enabled: memoryEnabled };
+      if (memoryEnabled && !body.clarification && body.constraints) {
+        // Default serialised form values are not explicit requests to erase memory.
+        body = {
+          ...body,
+          constraints: Object.fromEntries(
+            Object.entries(body.constraints).filter(
+              ([key, value]) =>
+                key === "exclude_movie_ids" ||
+                (value !== null &&
+                  value !== "" &&
+                  value !== "any" &&
+                  value !== "balanced" &&
+                  (!Array.isArray(value) || value.length > 0)),
+            ),
+          ),
+        };
+      }
       if (activeRequest.current === controller) lastAttempt.current = body;
       const data = validateResponse(
         await api("/recommendations", {
           method: "POST",
+          headers: identityHeaders(),
           body: JSON.stringify(body),
           signal: controller.signal,
         }),
@@ -505,6 +571,15 @@ export default function App() {
       }
       if (error instanceof ApiError && error.code === "STALE_CLARIFICATION")
         setClarificationStale(true);
+      if (
+        error instanceof ApiError &&
+        (error.code === "IDENTITY_REQUIRED" ||
+          error.code === "IDENTITY_MISMATCH")
+      ) {
+        setMemoryEnabled(false);
+        sessionId.current = undefined;
+        setClarificationStale(true);
+      }
     },
     onSettled: (_data, _error, { controller }) => {
       if (activeRequest.current === controller) inFlight.current = false;
@@ -521,6 +596,32 @@ export default function App() {
     setCancelled(false);
     setMessage("");
     recommend.mutate({ body, controller });
+  }
+  async function markSeen(movie: Movie) {
+    if (feedbackBusy || !identityToken()) return;
+    setFeedbackBusy(movie.movie_id);
+    const event =
+      feedbackEvents.current.get(movie.movie_id) ?? crypto.randomUUID();
+    feedbackEvents.current.set(movie.movie_id, event);
+    try {
+      if (!sessionId.current) {
+        const session = await api<{ session_id: string }>("/sessions", {
+          method: "POST",
+          headers: identityHeaders(),
+        });
+        sessionId.current = session.session_id;
+      }
+      await sendFeedback(sessionId.current, "seen", movie.movie_id, event);
+      feedbackEvents.current.delete(movie.movie_id);
+      setMessage(`已确认保存「${movie.title}」为已看；可在偏好与隐私移除。`);
+      if (memoryEnabled) setHidden((current) => [...current, movie.movie_id]);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "SESSION_EXPIRED")
+        sessionId.current = undefined;
+      setMessage(e instanceof Error ? e.message : "已看记录保存失败，请重试。");
+    } finally {
+      setFeedbackBusy(undefined);
+    }
   }
   function cancelRecommendation() {
     void queryClient.cancelQueries({ queryKey: ["opening-selection"] });
@@ -800,6 +901,31 @@ export default function App() {
                 </small>
               </div>
               <Ratings movie={movie} evidence={result?.evidence} />
+              {result?.source_results
+                ?.filter((source) => source.movie_id === movie.movie_id)
+                .map((source) => (
+                  <p className="muted" key={source.source}>
+                    {source.source}：
+                    {
+                      {
+                        ok: "已取得材料",
+                        no_results: "未取得评价",
+                        not_configured: "尚未配置来源或确认影片映射",
+                        access_limited: "访问受限",
+                        timeout: "请求超时",
+                        parse_error: "材料解析失败",
+                        upstream_error: "来源错误",
+                        budget_exhausted: "本次查询达到上限",
+                        ambiguous: "影片身份待确认",
+                      }[source.status]
+                    }
+                    {source.cache_status === "stale"
+                      ? " · 旧材料，更新失败"
+                      : source.cache_status === "fresh"
+                        ? " · 缓存"
+                        : ""}
+                  </p>
+                ))}
               <Availability candidate={candidate} />
               <details className="movie-context">
                 <summary>查看资料与观看提醒</summary>
@@ -829,6 +955,17 @@ export default function App() {
             </p>
           )}
           <div className="movie-actions">{actions(movie)}</div>
+          {hasIdentity && movie.movie_id.startsWith("itunes:") && (
+            <Button
+              className="text-button"
+              disabled={Boolean(feedbackBusy)}
+              onClick={() => void markSeen(movie)}
+            >
+              {feedbackBusy === movie.movie_id
+                ? "正在保存已看…"
+                : "确认已看并保存"}
+            </Button>
+          )}
           {candidate && (
             <>
               <EvidencePanel
@@ -1892,25 +2029,16 @@ export default function App() {
                   title="偏好与隐私"
                   subtitle="每一次选择，都应该由你掌握。"
                 />
+                <MemorySettings
+                  current={{
+                    genres: preferences.genres as SavedChoices["genres"],
+                    moods: preferences.moods as SavedChoices["moods"],
+                    max_runtime_minutes: runtime ? Number(runtime) : null,
+                    era,
+                  }}
+                  onChanged={memoryChanged}
+                />
                 <div className="settings">
-                  <section>
-                    <ShieldCheck />
-                    <div>
-                      <h2>长期记忆尚未启用</h2>
-                      <p>
-                        所有推荐请求均发送 memory_enabled:
-                        false。当前没有偏好读写或删除接口。
-                      </p>
-                      <label className="check-label disabled">
-                        <Checkbox.Root
-                          disabled
-                          className="checkbox"
-                          aria-label="记住我的观影偏好"
-                        />
-                        记住我的观影偏好（待后端接入）
-                      </label>
-                    </div>
-                  </section>
                   <section>
                     <Bookmark />
                     <div>
@@ -1947,7 +2075,7 @@ export default function App() {
                     <div>
                       <h2>数据控制的接入边界</h2>
                       <p>
-                        账号、历史记录、偏好导出与服务端数据删除均未实现。上面的清空操作只作用于当前页面，不代表删除服务端数据。
+                        匿名身份只代表此浏览器，不是账号登录。长期记录保存在服务端SQLite；上方删除个人数据会撤销此身份及关联会话。本次片单清空仅作用于页面。
                       </p>
                       <Link to="/about">
                         查看全部接入状态
@@ -2504,9 +2632,9 @@ function About() {
                 "未知不等于不可观看；不会提供虚假的播放按钮。",
               ],
               [
-                "账号、云端片单、长期记忆",
-                "尚未实现",
-                "无登录、偏好读写、历史、导出或服务端删除接口。",
+                "匿名长期记忆与账号边界",
+                "偏好与已看可用；账号尚未实现",
+                "确认后可保存偏好和已看、关闭记忆、修改及删除个人数据。没有账号登录、跨设备恢复、云端片单或偏好导出。",
               ],
               [
                 "资料来源与使用范围",

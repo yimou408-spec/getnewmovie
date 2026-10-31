@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from scripts.mvp_intent_contracts import IntentDecision, TurnContext
 from scripts.s0_contracts import Constraints
+from app.services.budget import consume
 
 PROMPT_VERSION = "mvp-intent-v1"
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
@@ -104,9 +105,10 @@ class ModelAdapter:
         started = time.perf_counter()
         try:
             def send(client):
+                timeout = consume(timeout=settings.timeout_seconds)
                 return client.post(settings.base_url.rstrip("/") + "/chat/completions", json=payload,
                                    headers={"Authorization": "Bearer " + settings.api_key},
-                                   timeout=settings.timeout_seconds, follow_redirects=False)
+                                   timeout=timeout, follow_redirects=False)
 
             if self.client is None:
                 with httpx.Client() as owned_client:

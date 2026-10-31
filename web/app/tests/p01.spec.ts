@@ -75,7 +75,15 @@ test("P01 legacy health remains compatible and unknown", async ({ page }) => {
     name: "能力接入状态",
     exact: true,
   });
-  await expect(region.getByText("待确认", { exact: true })).toHaveCount(6);
+  const rows = region
+    .getByRole("row")
+    .filter({ has: page.getByRole("rowheader") });
+  expect(await rows.count()).toBeGreaterThan(0);
+  for (const row of await rows.all()) {
+    await expect(
+      row.getByRole("cell", { name: "待确认", exact: true }),
+    ).toBeVisible();
+  }
   await expect(region.getByText("已接入", { exact: true })).toHaveCount(0);
 });
 

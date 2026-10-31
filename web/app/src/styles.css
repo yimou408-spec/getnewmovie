@@ -1628,6 +1628,13 @@ td .ratings > p {
   font-size: 19px;
   margin-bottom: 10px;
 }
+.memory-settings .button {
+  margin: 4px 8px 4px 0;
+}
+.memory-settings > p {
+  padding: 12px 24px;
+  margin: 0;
+}
 .settings p {
   max-width: 65ch;
   color: var(--muted);

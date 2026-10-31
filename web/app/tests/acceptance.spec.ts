@@ -140,8 +140,11 @@ test("real catalog, artwork, sources, watchlist and comparison", async ({
   });
   await page.getByRole("link", { name: "偏好与隐私", exact: true }).click();
   await expect(
-    page.getByRole("checkbox", { name: "记住我的观影偏好" }),
+    page.getByRole("button", { name: "建立匿名身份并启用记忆" }),
   ).toBeDisabled();
+  await expect(
+    page.getByRole("checkbox", { name: /同意在本机保存匿名身份/ }),
+  ).not.toBeChecked();
   await page.getByRole("button", { name: "清空本次片单与对比" }).click();
   await expect(page.locator(".compare-tray")).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -422,7 +425,21 @@ test("stalled artwork times out and can be retried without losing the film", asy
 test("unknown identities and scope documentation remain explicit", async ({
   page,
 }) => {
+  const lookup = page.waitForResponse((response) =>
+    response.url().endsWith("/api/movies/itunes%3A1"),
+  );
   await page.goto("/film/itunes%3A1");
+  const result = await lookup;
+  if (
+    result.status() === 503 &&
+    (await result.json()).code === "UPSTREAM_RATE_LIMIT"
+  ) {
+    test.setTimeout(180000);
+    await expect(page.getByRole("alert")).toContainText("一分钟后重试");
+    // Respect the actual provider's minute quota; retry the UI only once.
+    await page.waitForTimeout(61000);
+    await page.getByRole("button", { name: "重新尝试", exact: true }).click();
+  }
   await expect(page.getByRole("alert")).toContainText("影片");
   await page.goto("/about");
   const scopeTable = page

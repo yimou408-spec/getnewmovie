@@ -625,8 +625,11 @@
         "Y02",
         "C02"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "ready_for_review",
+      "evidence": "docs/backend/y02-identities-evidence.md",
+      "updated_on": "2026-10-31",
+      "completion_note": "SQLite v1-v3迁移、事务、身份/会话、重启和备份恢复已自测，待独立主审。",
+      "actual_hours": null
     },
     {
       "id": "Y03-Q",
@@ -666,8 +669,11 @@
         "C02",
         "Y03"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "in_progress",
+      "evidence": "docs/backend/y02-identities-evidence.md",
+      "updated_on": "2026-10-31",
+      "completion_note": "持久TTL、stale/失败语义、确认映射和来源结果已实现；豆瓣及第二独立源真实出口未通过。",
+      "actual_hours": null
     },
     {
       "id": "Y04-Q",
@@ -707,8 +713,11 @@
         "Y04",
         "C04"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "in_progress",
+      "evidence": "docs/backend/y02-identities-evidence.md",
+      "updated_on": "2026-10-31",
+      "completion_note": "反馈event_id幂等/撤销、会话/推荐/比较兼容、前端已看保存和记忆接线已实现；真实多源联调及主审待完成。",
+      "actual_hours": null
     },
     {
       "id": "Y05-Q",
@@ -747,8 +756,11 @@
         "Y03",
         "Y05"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "ready_for_review",
+      "evidence": "docs/backend/y02-identities-evidence.md",
+      "updated_on": "2026-10-31",
+      "completion_note": "匿名Bearer隔离、偏好/已看CRUD、双开关、明确确认、删除撤销身份及本次覆盖历史已自测；待主审。",
+      "actual_hours": null
     },
     {
       "id": "Y06-Q",
@@ -788,8 +800,11 @@
         "Y06",
         "C06"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "in_progress",
+      "evidence": "docs/backend/y02-identities-evidence.md",
+      "updated_on": "2026-10-31",
+      "completion_note": "共享20 HTTP/3搜索预算、45秒ASGI响应时限、限时锁等待、trace脱敏观测已实现；待真实多源故障验收。",
+      "actual_hours": null
     },
     {
       "id": "Y07-Q",
@@ -828,8 +843,11 @@
         "Y07",
         "P07"
       ],
-      "status": "not_started",
-      "evidence": null
+      "status": "in_progress",
+      "evidence": "docs/backend/y02-identities-evidence.md",
+      "updated_on": "2026-10-31",
+      "completion_note": "独立Python环境安装/166项回归、SQLite备份恢复和CLI已验证；另一成员环境及最终候选冻结待完成。",
+      "actual_hours": null
     },
     {
       "id": "Y08-Q",

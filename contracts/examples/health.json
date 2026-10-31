@@ -9,7 +9,7 @@
     "reviews": false,
     "natural_language": true,
     "model_understanding": false,
-    "long_term_memory": false,
+    "long_term_memory": true,
     "local_availability": false
   }
 }
