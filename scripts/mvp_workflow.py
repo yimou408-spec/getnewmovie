@@ -185,7 +185,11 @@ class AgentWorkflow:
             reroll_excluded = list(dict.fromkeys([*reroll_excluded, *context.displayed]))
         next_context = AgentContext(constraints.model_copy(deep=True),
                                     list(dict.fromkeys([*displayed, *(m.movie_id for m, at in selection.candidates)])),
-                                    True, state["method"], reroll_excluded=reroll_excluded)
+                                    True, state["method"],
+                                    # A completed response may never reach a cancelled browser request.
+                                    # Keep its fingerprint-bound confirmation valid until the next turn.
+                                    pending=context.pending if state.get("confirmed") else None,
+                                    reroll_excluded=reroll_excluded)
         return {"result": WorkflowResult("ready" if selection.candidates else "empty", constraints, next_context,
                                          method=state["method"], candidates=selection.candidates,
                                          catalog_size=len(rows), matched_count=len(selection.eligible),

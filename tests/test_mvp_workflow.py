@@ -63,6 +63,15 @@ def test_confirmation_skips_catalog_and_resume_does_not_call_model_again():
     assert result.constraints.exclude_genres == ["恐怖"]
     assert all("恐怖" not in row[0].genres for row in result.candidates)
 
+    # The browser may cancel after the server completed but before receiving it.
+    retried = flow.run(confirmed, result.context)
+    assert retried.status == "ready" and model.calls == 1
+    assert retried.constraints == result.constraints
+    changed = confirmed.model_copy(update={"query": "改为喜剧"})
+    assert flow.run(changed, retried.context).error_code == "STALE_CLARIFICATION"
+    newer = flow.run(request("新的选片想法"), retried.context)
+    assert flow.run(confirmed, newer.context).error_code == "STALE_CLARIFICATION"
+
 
 def test_reroll_and_reset_skip_model_and_do_not_share_other_context():
     catalog = Catalog()
