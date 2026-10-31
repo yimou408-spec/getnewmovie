@@ -16,6 +16,7 @@ class ServiceCapabilities(StrictModel):
     ratings: bool = False
     reviews: bool = False
     natural_language: bool = False
+    model_understanding: bool = False
     long_term_memory: bool = False
     local_availability: bool = False
 
@@ -57,7 +58,7 @@ class SessionResponse(StrictModel):
 
 
 class Interpretation(StrictModel):
-    method: Literal["rules-v1"] = "rules-v1"
+    method: Literal["rules-v1", "llm-v1"] = "rules-v1"
     effective_constraints: Constraints
     hard_conditions: list[str] = Field(default_factory=list)
     soft_preferences: list[str] = Field(default_factory=list)

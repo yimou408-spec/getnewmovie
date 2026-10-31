@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "Constraints": {
+      "additionalProperties": false,
+      "properties": {
+        "max_runtime_minutes": {
+          "anyOf": [
+            {
+              "maximum": 600,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Runtime Minutes"
+        },
+        "exclude_movie_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 500,
+          "title": "Exclude Movie Ids",
+          "type": "array"
+        },
+        "exclude_genres": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Exclude Genres",
+          "type": "array"
+        },
+        "preferred_tags": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Preferred Tags",
+          "type": "array"
+        },
+        "moods": {
+          "items": {
+            "enum": [
+              "轻松解压",
+              "温暖治愈",
+              "烧脑过瘾",
+              "浪漫心动",
+              "惊奇冒险",
+              "感动一下"
+            ],
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Moods",
+          "type": "array"
+        },
+        "genres": {
+          "items": {
+            "enum": [
+              "喜剧",
+              "科幻与奇幻",
+              "惊悚",
+              "动作",
+              "爱情",
+              "动画",
+              "剧情",
+              "家庭",
+              "纪录片",
+              "恐怖"
+            ],
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Genres",
+          "type": "array"
+        },
+        "company": {
+          "default": "",
+          "enum": [
+            "",
+            "一个人",
+            "两个人",
+            "和朋友",
+            "和家人"
+          ],
+          "title": "Company",
+          "type": "string"
+        },
+        "sort_by": {
+          "default": "balanced",
+          "enum": [
+            "balanced",
+            "popular"
+          ],
+          "title": "Sort By",
+          "type": "string"
+        },
+        "era": {
+          "default": "any",
+          "enum": [
+            "any",
+            "recent",
+            "2000s",
+            "classic"
+          ],
+          "title": "Era",
+          "type": "string"
+        }
+      },
+      "title": "Constraints",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Model supplies intent only. Absent update keys mean keep existing values.",
+  "properties": {
+    "action": {
+      "default": "recommend",
+      "enum": [
+        "recommend",
+        "refine",
+        "reroll",
+        "reset"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "updates": {
+      "$ref": "#/$defs/Constraints"
+    },
+    "conflicts": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 2,
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "unhandled": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 2,
+      "title": "Unhandled",
+      "type": "array"
+    }
+  },
+  "title": "IntentDecision",
+  "type": "object"
+}

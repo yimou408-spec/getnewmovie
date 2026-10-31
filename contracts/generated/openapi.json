@@ -843,7 +843,10 @@
         "properties": {
           "method": {
             "type": "string",
-            "const": "rules-v1",
+            "enum": [
+              "rules-v1",
+              "llm-v1"
+            ],
             "title": "Method",
             "default": "rules-v1"
           },
@@ -1414,6 +1417,11 @@
           "natural_language": {
             "type": "boolean",
             "title": "Natural Language",
+            "default": false
+          },
+          "model_understanding": {
+            "type": "boolean",
+            "title": "Model Understanding",
             "default": false
           },
           "long_term_memory": {

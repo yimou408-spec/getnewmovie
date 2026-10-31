@@ -77,7 +77,7 @@ describe("service capability compatibility", () => {
   });
   it("accepts old health responses but leaves all capabilities unknown", () => {
     render(<ServiceStatusView health={validateHealth(legacy)} />);
-    expect(screen.getAllByText("待确认")).toHaveLength(6);
+    expect(screen.getAllByText("待确认")).toHaveLength(7);
     expect(screen.queryByText("已接入")).toBeNull();
   });
   it("does not trust flags from an unexpected service or synthetic fallback", () => {
@@ -90,7 +90,7 @@ describe("service capability compatibility", () => {
         })}
       />,
     );
-    expect(screen.getAllByText("待确认")).toHaveLength(6);
+    expect(screen.getAllByText("待确认")).toHaveLength(7);
     expect(screen.queryByText("已接入")).toBeNull();
   });
   it("rejects malformed flags instead of turning strings into available capabilities", () => {
