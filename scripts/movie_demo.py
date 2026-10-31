@@ -1,5 +1,6 @@
 """Build and serve the local demo on one loopback port, without embedded keys."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -40,6 +41,19 @@ def optional_local_runtime(settings):
         yield
 
 
+def build_frontend(folder):
+    """Reinstall on lock changes, including a teammate's subsequent git pull."""
+    npm = shutil.which("npm.cmd") or shutil.which("npm")
+    if not npm:
+        raise RuntimeError("Node.js/npm is missing. Use start-demo.cmd on Windows.")
+    fingerprint = hashlib.sha256((folder / "package-lock.json").read_bytes()).hexdigest()
+    stamp = folder / "node_modules/.movie-lock.sha256"
+    if not stamp.is_file() or stamp.read_text(encoding="ascii").strip() != fingerprint:
+        subprocess.run([npm, "ci", "--no-audit", "--no-fund"], cwd=folder, check=True)
+        stamp.write_text(fingerprint, encoding="ascii")
+    subprocess.run([npm, "run", "build"], cwd=folder, check=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8000)
@@ -65,16 +79,10 @@ def main():
             return 2
     folder = ROOT / "web/app"
     if not args.no_build:
-        npm = shutil.which("npm.cmd") or shutil.which("npm")
-        if not npm:
-            print("Node.js/npm is required. Install Node.js and run again.")
-            return 2
         try:
-            if not (folder / "node_modules").is_dir():
-                subprocess.run([npm, "ci"], cwd=folder, check=True)
-            subprocess.run([npm, "run", "build"], cwd=folder, check=True)
-        except subprocess.CalledProcessError:
-            print("Frontend build failed; the server was not started.")
+            build_frontend(folder)
+        except (RuntimeError, subprocess.CalledProcessError) as error:
+            print(f"Frontend build failed ({type(error).__name__}); the server was not started.")
             return 1
     if not (folder / "dist/index.html").is_file():
         print("Frontend build is missing. Run without --no-build.")
@@ -85,11 +93,11 @@ def main():
     print(f"Local demo: {url}  Setup: {url}setup")
     print(f"Catalog: {report.catalog_provider}; text parser: {report.intent_method}. Configuration does not establish live verification.")
     print("Keep this terminal open. Press Ctrl+C to stop this demo.")
-    if not args.no_browser:
-        timer = threading.Timer(1.5, webbrowser.open, args=(url,))
-        timer.daemon = True
-        timer.start()
     with optional_local_runtime(settings):
+        if not args.no_browser:
+            timer = threading.Timer(1.5, webbrowser.open, args=(url,))
+            timer.daemon = True
+            timer.start()
         uvicorn.run(create_app(settings=settings), host="127.0.0.1", port=args.port, log_level="warning")
     return 0
 

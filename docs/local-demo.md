@@ -2,11 +2,13 @@
 
 ## 不配置密钥也能演示
 
-在 Windows 上安装 Python 3.11+ 和 Node.js 24，双击项目根目录 `start-demo.cmd`。首次运行会安装 Python/Node 依赖，下载约 1.1 GB 的本机 Qwen 模型，核对 SHA256 并构建页面，等待终端出现本地地址。后续复用本机模型文件。退出时 Ctrl+C；启动器仅停止自己创建的模型进程。
+队友从 GitHub 拉取代码或解压源码，在 Windows 10/11 x64 上双击项目根目录 `start-demo.cmd`。无需预装 Python/Node，无需管理员权限或 API 密钥。首次自动下载固定版本的 uv 0.9.8、Python 3.13.9、Node.js 24.11.1，按 `requirements-demo.lock` 与 `web/app/package-lock.json` 安装依赖，再下载约 1.1 GB 的本机 Qwen 模型并构建页面。请等待终端进度，浏览器在准备完成后打开。工具与模型均核对官方 SHA256，Python 依赖核对锁定哈希，npm 使用锁文件的完整性信息。
+
+运行环境位于忽略的 `artifacts/bootstrap/`、`.venv/`，模型位于 `artifacts/local-model/`；不修改系统 PATH、代理或执行策略。首次安装需要网络和额外磁盘空间，建议至少预留 6 GB；再次双击会复用下载与环境。拉取新代码后，Python 按锁文件安装，前端锁文件有变化时自动重装，避免沿用旧依赖。退出时 Ctrl+C；启动器仅停止自己创建的模型进程。
 
 默认使用 Apple 美国区公开榜单和本机 Qwen2.5-1.5B-Instruct，需要可访问 Apple 的网络。可演示零输入选片、条件筛选、真实模型提取条件与澄清、影片详情、来源核对、当前片单、对比和主题跟随系统。页面均可直接刷新。TMDB 与云模型账号均非前置条件。
 
-8000 已占用时启动器不会停止已有程序；运行 `start-demo.cmd --port 8001`。服务仅监听本机 `127.0.0.1`，未部署到公网。换电脑需复制代码并安装环境，不能只复制浏览器地址。
+8000 已占用时启动器不会停止已有程序；运行 `start-demo.cmd --port 8001`。服务仅监听本机 `127.0.0.1`，未部署到公网。换电脑后从 GitHub 获取源码并双击启动器，不能只复制浏览器地址；也不要复制其他电脑的 `.venv` 或 `node_modules`。
 
 ## TMDB token 怎么取得
 
@@ -56,8 +58,8 @@
 
 | 现象 | 处理 |
 | --- | --- |
-| 找不到 Python/Node | 安装版本后重开终端；启动器不修改系统执行策略 |
-| `python` 打开 Windows 商店 | 使用 `.venv\Scripts\python.exe`；启动器优先 `py -3` 创建环境 |
+| 工具或依赖下载失败 | 检查能否访问 GitHub、nodejs.org、Python/PyPI 与 npm 下载源，再次双击；已完成的工具分段会保留，不需手动安装 Python/Node |
+| `python` 打开 Windows 商店 | 双击 `start-demo.cmd`，它使用项目内的 Python；手动排错使用 `.venv\Scripts\python.exe` |
 | 端口占用 | 保留已有服务，使用 `--port 8001` |
 | TMDB 鉴权失败 | 核对 API Read Access Token、账号权限和旧环境变量，勿粘贴登录密码 |
 | 网络或上游超时 | 检查资料源网络；页面显示错误，不用样例补齐 |
