@@ -1,0 +1,7 @@
+# Keep source, generated contracts and formatter input identical on every checkout.
+* text=auto eol=lf
+
+# Native Windows launchers retain Windows line endings in the working tree.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
