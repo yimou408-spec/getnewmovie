@@ -75,7 +75,10 @@ test("P01 legacy health remains compatible and unknown", async ({ page }) => {
     name: "能力接入状态",
     exact: true,
   });
-  await expect(region.getByText("待确认", { exact: true })).toHaveCount(6);
+  await expect(region.getByText("待确认", { exact: true })).toHaveCount(7);
+  await expect(
+    region.getByRole("row", { name: /模型理解与Agent工作流/ }),
+  ).toContainText("待确认");
   await expect(region.getByText("已接入", { exact: true })).toHaveCount(0);
 });
 
