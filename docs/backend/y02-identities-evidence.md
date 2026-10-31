@@ -136,3 +136,5 @@ python -m scripts.backend_admin map --movie-id itunes:实际主ID --provider dou
 用户2026-10-31确认“暂时用离线，后续提醒我用真实模型验收”。本轮按离线工程验收交付，既有Apple真实冒烟作为附加证据；不再为本轮等待LLM/TMDB配置，也不把离线模型替身标成真实DeepSeek通过。
 
 下一次继续开发或最终交付前，先提醒用户在本机配置`LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`（不发聊天），再明确运行`python -m scripts.mvp_probe_model --live --case E02 --max-requests 1`，以及同一版本的真实冲突确认、失败恢复、记忆开关/补充/换组与删除验收；记录实际响应模型及脱敏结果。TMDB另需进程变量`TMDB_READ_TOKEN`，豆瓣/第二源仍需真实可用通路。P/C独立评审与另一环境复现保留待办。
+
+交付代码`d2fe338`已推送，评审入口为[PR #7](https://github.com/yimou408-spec/getnewmovie/pull/7)，目标main，等待独立主审。云端[后端检查](https://github.com/yimou408-spec/getnewmovie/actions/runs/41189032534)与[前端检查](https://github.com/yimou408-spec/getnewmovie/actions/runs/41189032572)均在运行任何步骤前被GitHub拒绝启动；检查注释为“The job was not started because recent account payments have failed or your spending limit needs to be increased.”。账号Billing & plans恢复后再重跑，不能把这两条标作代码测试失败或CI通过。未修改账号付款/限额设置。
