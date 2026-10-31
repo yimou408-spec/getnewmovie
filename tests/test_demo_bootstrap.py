@@ -1,4 +1,12 @@
 """Offline regressions for fresh-checkout and subsequent-pull startup."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import zipfile
+
 import pytest
 
 from scripts import movie_demo
@@ -55,3 +63,27 @@ def test_existing_unstamped_node_modules_are_not_assumed_current(tmp_path, monke
     monkeypatch.setattr(movie_demo.subprocess, "run", lambda command, **_: calls.append(command[1]))
     movie_demo.build_frontend(tmp_path)
     assert calls == ["ci", "run"]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows one-click bootstrap")
+def test_interrupted_tool_extraction_is_completed_on_the_next_start(tmp_path):
+    cache = tmp_path / "tool cache"
+    folder = cache / "fixture"
+    folder.mkdir(parents=True)
+    (folder / "tool.exe").write_bytes(b"interrupted extraction")
+    archive = cache / "fixture.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("tool.exe", b"complete fixture; never executed")
+        output.writestr("required.dat", b"required package data")
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"tools": [{
+        "name": "offline fixture", "version": "1", "size": archive.stat().st_size,
+        "url": "https://invalid.example/not-requested", "sha256": digest,
+        "archive": archive.name, "folder": "fixture", "executable": "tool.exe",
+    }]}), encoding="utf-8")
+    env = dict(os.environ, MOVIE_BOOTSTRAP=str(cache), MOVIE_TOOLCHAIN=str(manifest))
+    env["PSMODULEPATH"] = str(Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/Modules")
+    subprocess.run([env["COMSPEC"], "/d", "/c", str(movie_demo.ROOT / "scripts/bootstrap-tools.cmd")],
+                   env=env, check=True, capture_output=True, timeout=30)
+    assert (folder / "required.dat").read_bytes() == b"required package data"
