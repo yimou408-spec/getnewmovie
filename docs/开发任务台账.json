@@ -584,8 +584,8 @@
       ],
       "status": "in_progress",
       "evidence": "docs/backend/y02-identities-evidence.md",
-      "updated_on": "2026-10-26",
-      "completion_note": "离线适配器、显式身份映射、兼容契约及生成类型已实现；豆瓣实证、TMDB配置、C01/C02、三方冻结及主审仍待完成。",
+      "updated_on": "2026-10-31",
+      "completion_note": "离线适配器、显式身份映射、兼容契约及生成类型已实现，e891591尚未合入main；豆瓣实证、TMDB真实覆盖、C02、三方冻结及主审仍待完成。0e2a54c已交付C01模型部分及MVP主图/API，复用范围见三人台账2026-10-31 Git核对。",
       "actual_hours": null
     },
     {
