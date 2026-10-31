@@ -57,7 +57,8 @@ import {
   type SearchResponse,
 } from "./domain";
 import { ErrorNotice } from "./request-feedback";
-import { ServiceStatus } from "./service-status";
+import { ServiceStatus, useServiceHealth } from "./service-status";
+import { RuntimeSetup } from "./runtime-setup";
 import { EvidencePanel, Ratings, SourceOpinions } from "./evidence";
 import {
   reasonLabels,
@@ -235,7 +236,9 @@ function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
   const url = safeSourceUrl(movie.poster_url);
   const canShow =
     url &&
-    new URL(url).hostname.endsWith(".mzstatic.com") &&
+    (new URL(url).hostname.endsWith(".mzstatic.com") ||
+      (movie.movie_id.startsWith("tmdb:") &&
+        new URL(url).hostname === "image.tmdb.org")) &&
     movie.source_url &&
     status !== "error" &&
     status !== "timeout";
@@ -255,7 +258,11 @@ function Poster({ movie, small = false }: { movie: Movie; small?: boolean }) {
           <>
             <img
               key={attempt}
-              src={`/api/artwork/${encodeURIComponent(movie.movie_id)}?attempt=${attempt}`}
+              src={
+                movie.movie_id.startsWith("tmdb:")
+                  ? (url ?? undefined)
+                  : `/api/artwork/${encodeURIComponent(movie.movie_id)}?attempt=${attempt}`
+              }
               alt={`${movie.title} 海报`}
               loading="eager"
               decoding="async"
@@ -319,6 +326,8 @@ function StoreBadge({ movie }: { movie: Movie }) {
       />
       <span>美国区商店 · 非直接播放</span>
     </a>
+  ) : movie.movie_id.startsWith("tmdb:") && url ? (
+    <SourceLink url={url}>在 TMDB 核对影片资料</SourceLink>
   ) : null;
 }
 function MovieFacts({ movie }: { movie: Movie }) {
@@ -352,6 +361,7 @@ function SourceLink({
 }
 
 export default function App() {
+  const service = useServiceHealth();
   const [mode, setMode] = useState<Mode>("discover");
   const [drafts, setDrafts] = useState(initialDrafts);
   const [preferences, setPreferences] =
@@ -485,6 +495,10 @@ export default function App() {
         return;
       setCancelled(false);
       setResult(data);
+      if (data.warnings.some((warning) => warning.includes("已切换至 Apple")))
+        void queryClient.invalidateQueries({
+          queryKey: ["service-capabilities"],
+        });
       setResultRequest(body);
       setSnapshotQuery(body.query);
       setHidden([]);
@@ -895,8 +909,13 @@ export default function App() {
         <div>
           <Info size={16} aria-hidden="true" />
           <span>
-            <strong>真实片库已接入</strong> · Apple 美国区电影榜单 ·
-            类型、心情与时长参与匹配。
+            <strong>真实片库已接入</strong> ·{" "}
+            {service.data?.provider === "TMDB"
+              ? "TMDB 热门电影"
+              : service.data?.provider === "Apple iTunes US"
+                ? "Apple 美国区电影榜单"
+                : "资料源状态待确认"}{" "}
+            · 类型、心情与时长参与匹配。
           </span>
           <Link to="/about">
             查看接入状态
@@ -1512,6 +1531,18 @@ export default function App() {
                           </Button>
                         </div>
                       )}
+                      {result.warnings
+                        .filter(
+                          (warning) =>
+                            warning.startsWith("模型暂时不可用") ||
+                            warning.includes("已切换至 Apple"),
+                        )
+                        .map((warning) => (
+                          <p className="notice" role="status" key={warning}>
+                            <ShieldCheck size={16} aria-hidden="true" />
+                            {warning}
+                          </p>
+                        ))}
                       {result.warnings.length > 0 && (
                         <div className="result-limits">
                           <p>
@@ -1529,9 +1560,15 @@ export default function App() {
                             <summary>
                               数据边界与说明（{result.warnings.length}）
                             </summary>
-                            {result.warnings.map((warning, i) => (
-                              <p key={i}>{warning}</p>
-                            ))}
+                            {result.warnings
+                              .filter(
+                                (warning) =>
+                                  !warning.startsWith("模型暂时不可用") &&
+                                  !warning.includes("已切换至 Apple"),
+                              )
+                              .map((warning, i) => (
+                                <p key={i}>{warning}</p>
+                              ))}
                           </details>
                         </div>
                       )}
@@ -1612,7 +1649,8 @@ export default function App() {
                         </div>
                       )}
                       {resultRequest?.mode === "discover" &&
-                        result.interpretation?.method === "llm-v1" &&
+                        (result.interpretation?.method === "llm-v1" ||
+                          resultRequest.input_source === "natural_language") &&
                         result.status !== "needs_clarification" && (
                           <form
                             className="selection-summary"
@@ -1694,7 +1732,10 @@ export default function App() {
                             onClick={() => {
                               if (
                                 resultRequest?.mode === "discover" &&
-                                result.interpretation?.method === "llm-v1"
+                                result.interpretation &&
+                                (result.interpretation?.method === "llm-v1" ||
+                                  resultRequest.input_source ===
+                                    "natural_language")
                               ) {
                                 startRecommendation({
                                   ...resultRequest,
@@ -1960,6 +2001,7 @@ export default function App() {
             }
           />
           <Route path="/about" element={<About />} />
+          <Route path="/setup" element={<RuntimeSetup />} />
           <Route
             path="*"
             element={
@@ -2086,6 +2128,8 @@ function MovieLookup({
   chooseLabel: string;
   saved?: Movie[];
 }) {
+  const service = useServiceHealth();
+  const isTMDB = service.data?.provider === "TMDB";
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("");
   const [searched, setSearched] = useState(false);
@@ -2196,8 +2240,9 @@ function MovieLookup({
         </Button>
       </div>
       <p className="muted small-text">
-        检索 Apple
-        美国区当前分类榜单，非全量片库；请用来源原文片名，中文译名可能查不到。
+        {isTMDB
+          ? "检索 TMDB 电影资料，每次最多返回 8 部候选；请核对片名与年份，中文资料可能缺失。"
+          : "检索 Apple 美国区当前分类榜单，非全量片库；请用来源原文片名，中文译名可能查不到。"}
       </p>
       {search.error && <ErrorNotice error={search.error} retry={run} />}
       {searched && search.data && !search.isPending && !search.error && (
@@ -2208,7 +2253,9 @@ function MovieLookup({
               ? search.data.requires_confirmation
                 ? "找到同名影片，请确认具体年份。"
                 : "请核对影片后确认。"
-              : "没有找到影片。请核对来源原文片名，或清空年份后重试；当前仅检索 Apple 美国区分类榜单。"}
+              : isTMDB
+                ? "没有找到影片。请核对片名，或清空年份后重试；本次候选并不覆盖全量片库。"
+                : "没有找到影片。请核对来源原文片名，或清空年份后重试；当前仅检索 Apple 美国区分类榜单。"}
           </p>
           {search.data.movies.map((m) => (
             <div className="lookup-item" key={m.movie_id}>
@@ -2440,6 +2487,8 @@ function Compare({
   );
 }
 function About() {
+  const service = useServiceHealth();
+  const isTMDB = service.data?.provider === "TMDB";
   return (
     <>
       <PageHeading
@@ -2450,11 +2499,19 @@ function About() {
         <Clapperboard size={32} />
         <h2>为一场恰好的电影，少做一点选择题。</h2>
         <p>
-          电影资料来自 Apple
-          美国区公开电影榜单及影片查询接口。配置模型后可理解文字要求并在本次会话继续调整，点选与硬条件仍由代码执行。心情结合类型与简介词法线索排序，均衡探索会分散类型与导演。来源缓存
+          电影资料来自{" "}
+          {isTMDB
+            ? "TMDB 热门电影及影片查询接口"
+            : "Apple 美国区公开电影榜单及影片查询接口"}
+          。文字可由本机或配置的云模型理解，并在本次会话继续调整；模型不可用时使用规则解析。点选与硬条件由代码执行。心情结合类型与简介词法线索排序，均衡探索会分散类型与导演。来源缓存
           30 分钟，保留采集时间。
         </p>
       </div>
+      <p>
+        <Link to="/setup" className="button secondary">
+          本机运行配置与接入指引 <ChevronRight size={16} />
+        </Link>
+      </p>
       <ServiceStatus />
       <h2 className="section-heading">页面功能与使用边界</h2>
       <div
@@ -2476,12 +2533,14 @@ function About() {
               [
                 "影片查找与身份确认",
                 "按资料源查找",
-                "按来源原文片名检索并确认年份，最多 50 条。商店搜索无电影结果时查当前分类榜单；未覆盖的影片可能查不到。推荐候选仍来自分类榜单。",
+                isTMDB
+                  ? "按片名检索并确认年份，单次最多 8 部。资料源热门候选并不覆盖全量电影。"
+                  : "按来源原文片名检索并确认年份，最多 50 条。商店搜索无电影结果时查当前分类榜单；未覆盖的影片可能查不到。推荐候选仍来自分类榜单。",
               ],
               [
                 "类型、心情与片长匹配",
                 "模型理解与规则筛选",
-                "配置模型后由模型理解文字，未配置时沿用规则解析。冲突或无法执行的条件先确认；类型、年代和片长由代码严格筛选，心情只辅助排序。可继续补充条件、换组或重新开始，实际接入状态见上表。",
+                "文字可由本机 Qwen 或配置的云模型理解；模型不可用时使用规则解析。冲突或无法执行的条件先确认，类型、年代和片长由代码严格筛选，心情只辅助排序。可继续补充条件、换组或重新开始，实际接入状态见上表。",
               ],
               [
                 "影片对比",
@@ -2496,7 +2555,9 @@ function About() {
               [
                 "来源海报",
                 "海报已接入",
-                "使用来源海报并链接对应商店。评分、影评与剧情总结尚未接入。",
+                isTMDB
+                  ? "使用 TMDB 海报和用户评分，保留评分量表、投票人数与采集时间。影评与剧情总结尚未接入。"
+                  : "使用来源海报并链接对应商店。评分、影评与剧情总结尚未接入。",
               ],
               [
                 "地区观看渠道",
@@ -2510,8 +2571,8 @@ function About() {
               ],
               [
                 "资料来源与使用范围",
-                "Apple 美国区公开数据",
-                "海报用于介绍并链接原电影商店；未提供播放、下载或完整片库覆盖保证。",
+                isTMDB ? "TMDB API" : "Apple 美国区公开数据",
+                "海报用于介绍并链接来源资料页；未提供播放、下载或完整片库覆盖保证。",
               ],
             ].map((row) => (
               <tr key={row[0]}>
@@ -2523,11 +2584,27 @@ function About() {
           </tbody>
         </table>
       </div>
+      {isTMDB && (
+        <p>
+          <a
+            href="https://www.themoviedb.org/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <img
+              src="/tmdb-logo.svg"
+              alt="The Movie Database (TMDB)"
+              width="137"
+              height="18"
+            />
+          </a>
+        </p>
+      )}
       <p className="muted">
-        海报由 Apple
-        图片服务加载；商店链接会打开第三方网站。未使用外部字体、追踪脚本或分析服务。iTunes
-        Store is a trademark of Apple Inc., registered in the U.S. and other
-        countries.
+        {isTMDB
+          ? "This product uses the TMDB API but is not endorsed or certified by TMDB. 海报由 TMDB 图片服务加载，资料链接会打开第三方网站。"
+          : "海报由 Apple 图片服务加载；商店链接会打开第三方网站。iTunes Store is a trademark of Apple Inc., registered in the U.S. and other countries."}{" "}
+        未使用外部字体、追踪脚本或分析服务。
       </p>
     </>
   );

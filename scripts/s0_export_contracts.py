@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.s0_contracts import RecommendationRequest, RecommendationResponse, ErrorResponse, HealthResponse, SourceEvidenceResult
+from scripts.s0_contracts import RecommendationRequest, RecommendationResponse, ErrorResponse, HealthResponse, SourceEvidenceResult, RuntimeConfiguration
 from scripts.movie_server import app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +16,7 @@ def documents():
         "error-response.schema.json": ErrorResponse.model_json_schema(),
         "health-response.schema.json": HealthResponse.model_json_schema(),
         "source-evidence-result.schema.json": SourceEvidenceResult.model_json_schema(),
+        "configuration-response.schema.json": RuntimeConfiguration.model_json_schema(),
         "openapi.json": app.openapi(),
     }
 

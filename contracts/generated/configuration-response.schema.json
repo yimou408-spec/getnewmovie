@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "IntegrationState": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "not_configured",
+            "incomplete",
+            "invalid",
+            "configured"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "missing": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing",
+          "type": "array"
+        },
+        "live_verified": {
+          "default": false,
+          "title": "Live Verified",
+          "type": "boolean"
+        },
+        "verified_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verified At"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "IntegrationState",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "catalog_provider": {
+      "enum": [
+        "apple",
+        "tmdb"
+      ],
+      "title": "Catalog Provider",
+      "type": "string"
+    },
+    "intent_method": {
+      "enum": [
+        "rules-v1",
+        "llm-v1"
+      ],
+      "title": "Intent Method",
+      "type": "string"
+    },
+    "llm": {
+      "$ref": "#/$defs/IntegrationState"
+    },
+    "tmdb": {
+      "$ref": "#/$defs/IntegrationState"
+    },
+    "model_location": {
+      "default": "rules",
+      "enum": [
+        "local",
+        "remote",
+        "rules"
+      ],
+      "title": "Model Location",
+      "type": "string"
+    },
+    "model_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Name"
+    },
+    "catalog_fallback_active": {
+      "default": false,
+      "title": "Catalog Fallback Active",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "catalog_provider",
+    "intent_method",
+    "llm",
+    "tmdb"
+  ],
+  "title": "RuntimeConfiguration",
+  "type": "object"
+}

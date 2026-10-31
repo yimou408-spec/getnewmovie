@@ -42,6 +42,24 @@
         }
       }
     },
+    "/configuration": {
+      "get": {
+        "summary": "Configuration",
+        "operationId": "configuration_configuration_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeConfiguration"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/recommendations": {
       "post": {
         "summary": "Recommendations",
@@ -839,6 +857,49 @@
         ],
         "title": "HealthResponse"
       },
+      "IntegrationState": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "not_configured",
+              "incomplete",
+              "invalid",
+              "configured"
+            ],
+            "title": "State"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "live_verified": {
+            "type": "boolean",
+            "title": "Live Verified",
+            "default": false
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "IntegrationState"
+      },
       "Interpretation": {
         "properties": {
           "method": {
@@ -1396,6 +1457,67 @@
           "memory_used"
         ],
         "title": "RecommendationResponse"
+      },
+      "RuntimeConfiguration": {
+        "properties": {
+          "catalog_provider": {
+            "type": "string",
+            "enum": [
+              "apple",
+              "tmdb"
+            ],
+            "title": "Catalog Provider"
+          },
+          "intent_method": {
+            "type": "string",
+            "enum": [
+              "rules-v1",
+              "llm-v1"
+            ],
+            "title": "Intent Method"
+          },
+          "llm": {
+            "$ref": "#/components/schemas/IntegrationState"
+          },
+          "tmdb": {
+            "$ref": "#/components/schemas/IntegrationState"
+          },
+          "model_location": {
+            "type": "string",
+            "enum": [
+              "local",
+              "remote",
+              "rules"
+            ],
+            "title": "Model Location",
+            "default": "rules"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "catalog_fallback_active": {
+            "type": "boolean",
+            "title": "Catalog Fallback Active",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "catalog_provider",
+          "intent_method",
+          "llm",
+          "tmdb"
+        ],
+        "title": "RuntimeConfiguration"
       },
       "ServiceCapabilities": {
         "properties": {

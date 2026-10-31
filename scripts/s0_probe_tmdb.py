@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+from scripts.movie_config import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -131,7 +132,7 @@ def main():
     if not args.live:
         print("NOT RUN: add --live and set TMDB_READ_TOKEN; no HTTP requests made.")
         return 2
-    token = os.getenv("TMDB_READ_TOKEN", "").strip()
+    token = Settings.load().tmdb_read_token
     if not token:
         print("NOT_CONFIGURED: TMDB_READ_TOKEN is empty; no HTTP requests made.")
         return 2
@@ -140,7 +141,8 @@ def main():
     samples = json.loads(args.samples.read_text(encoding="utf-8"))[:args.limit]
     rows = []
     exhausted = False
-    with httpx.Client(timeout=10, follow_redirects=False) as client:
+    with httpx.Client(timeout=10, follow_redirects=False, trust_env=False,
+                      proxy=os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")) as client:
         probe = TMDBProbe(token, client=client, max_requests=args.max_requests)
         for sample in samples:
             try:
