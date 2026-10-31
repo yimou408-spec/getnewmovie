@@ -1,7 +1,7 @@
-"""Bounded, deterministic P02 adapter. Not an LLM or the planned C04 graph.
+"""Bounded intent sessions with local/cloud extraction and deterministic fallback.
 
-No third party receives the user's prose. Only accepted constraints reach the
-real catalog. Unsupported prose requires consent; no synthetic movie fallback.
+Only accepted constraints reach the real catalog. Unsupported prose requires
+consent; no synthetic movie fallback. Cloud prose transfer is opt-in via config.
 Sessions are anonymous capability tokens, process-local, capped and expiring.
 """
 from dataclasses import dataclass
@@ -130,7 +130,7 @@ def parse_text(query):
         remove(pattern, lambda m, label=label: add("moods", label))
     if set(parsed.get("genres", [])) & set(parsed.get("exclude_genres", [])):
         unhandled.append("文字同时要求并排除同一类型，请重新描述")
-    residue = re.sub(r"(?:什么都行|没有特别偏好|随便|都可以|下班后|下班|今晚|今天|现在|周末|我们|我|想要|希望|想|推荐|给我|帮我|找|看看|看|一部|几部|电影|片子|片|一点|一下|有点|一些|的|和|或|但是|但|直接|候选|please|a movie|movies?|want|some)", "", text)
+    residue = re.sub(r"(?:什么都行|没有特别偏好|随便|都可以|下班后|下班|今晚|今天|现在|周末|我们|我|想要|希望|想|推荐|给我|帮我|找|一起|看看|看|一部|几部|电影|片子|片|一点|一下|有点|一些|的|和|或|但是|但|直接|候选|please|a movie|movies?|want|some)", "", text)
     residue = re.sub(r"[\s，。；、！？,.!?;:：]", "", residue)
     if residue:
         unhandled.insert(0, residue[:200])
@@ -166,13 +166,16 @@ class Pending:
     conflicts: list[str]
     unhandled: list[str]
     questions: list[Question]
+    method: str
 
 
 class IntentSessions:
-    def __init__(self, ttl=1800, capacity=256, clock=time.monotonic):
+    def __init__(self, ttl=1800, capacity=256, clock=time.monotonic, parser=None):
         self.ttl, self.capacity, self.clock = ttl, capacity, clock
         self.sessions = {}
         self.lock = RLock()
+        self.parser = parser or parse_text
+        self.method = getattr(parser, "method", "rules-v1")
 
     def create(self):
         with self.lock:
@@ -203,8 +206,13 @@ class IntentSessions:
                     raise CatalogError("INVALID_CLARIFICATION", "请完整选择当前问题提供的选项。", 422)
                 c = pending.picks if answers.get("conflict") == "按点选条件" else pending.text
                 c = c.model_copy(update={"exclude_movie_ids": body.constraints.exclude_movie_ids})
-                return explain(c, conflicts=[], unhandled=pending.unhandled), None, []
-            parsed, unhandled = parse_text(body.query)
+                return explain(c, method=pending.method, conflicts=[], unhandled=pending.unhandled), None, []
+            method = self.method
+            try:
+                parsed, unhandled = self.parser(body.query)
+            except CatalogError:
+                parsed, unhandled = parse_text(body.query)
+                method = "rules-v1"
             original = body.constraints
             merged = original.model_dump()
             conflicts = []
@@ -233,13 +241,13 @@ class IntentSessions:
                 questions.append(Question(question_id="unhandled", text="这些要求暂时无法可靠执行：" + "；".join(unhandled) + "。要仅按已识别条件继续吗？", options=["仅按已识别条件继续"] if not any("同时要求并排除" in x for x in unhandled) else []))
             if not questions:
                 self.sessions[body.session_id] = (entry[0], None)
-                return explain(c), None, []
+                return explain(c, method=method), None, []
             if not pending or pending.fingerprint != fingerprint:
                 picks = original.model_copy(deep=True)
                 text_values = c.model_dump()
                 # A text exclusion explicitly conflicts with an included pick.
                 text_values["genres"] = [g for g in c.genres if g not in c.exclude_genres]
                 c = Constraints.model_validate(text_values)
-                pending = Pending(fingerprint, uuid4().hex, c, picks, conflicts, unhandled, questions)
+                pending = Pending(fingerprint, uuid4().hex, c, picks, conflicts, unhandled, questions, method)
                 self.sessions[body.session_id] = (entry[0], pending)
-            return explain(pending.text, conflicts=conflicts, unhandled=unhandled), pending.token, pending.questions
+            return explain(pending.text, method=pending.method, conflicts=conflicts, unhandled=unhandled), pending.token, pending.questions

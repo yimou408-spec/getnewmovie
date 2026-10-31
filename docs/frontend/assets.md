@@ -1,5 +1,9 @@
 # 素材来源
 
+## 可选 TMDB 来源（2026-10-31）
+
+`web/app/public/tmdb-logo.svg` 原样取自 [TMDB 官方 API 文档使用的标识](https://files.readme.io/29c6fee-blue_short.svg)，未修改颜色、比例或图形，仅在使用 TMDB 时的关于页小幅展示。页面保留官方免责声明，参见 [署名要求](https://developer.themoviedb.org/docs/faq)。海报使用 API 返回的 poster_path 组成 `https://image.tmdb.org/t/p/w500/…`，不下载到仓库，并链接对应资料页。版权属于相应权利人；离线测试不代表真实 token 验收。
+
 | 文件 | 作者与原始页面 | 许可证 | 使用方式 |
 | --- | --- | --- | --- |
 | `web/app/public/images/coastal-train.webp` | [Shawn Rain / Unsplash](https://unsplash.com/photos/a-view-of-the-ocean-from-inside-a-train-JCqY2Ji5gj4) | [Unsplash License](https://unsplash.com/license)，2026-10-19 核对：允许免费商业使用、复制、修改与分发 | 首页氛围摄影，2200×1237 WebP，151392 字节；页面保留作者与来源链接 |

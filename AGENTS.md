@@ -4,7 +4,7 @@
 
 This repository contains the S0 experiments and a running Apple-catalog movie application. The current MVP adds model interpretation and a LangGraph workflow; it is not a production service. Read `docs/MVP开发工作记录.md` for current scope, actual results, and remaining work; historical three-person schedules are reference only. Prefer updating existing Markdown files over creating new ones.
 
-- `scripts/`: Pydantic contracts, FastAPI mock, schema exporter, probes, and evaluation utilities.
+- `scripts/`: real Apple/TMDB catalog service, optional model intent parser, Pydantic contracts, schema exporter, probes, and historical mock utilities.
 - `tests/s0/`: offline contract, HTTP, evaluation, and prototype syntax tests.
 - `contracts/examples/`: shared synthetic requests and responses; `contracts/generated/`: exported JSON Schema and OpenAPI.
 - `data/s0/`: synthetic catalog, evaluation tasks, and pending-review TMDB query seeds.
@@ -24,7 +24,7 @@ python -m scripts.s0_export_contracts --check
 python -m uvicorn scripts.s0_mock_server:app --host 127.0.0.1 --port 8000
 ```
 
-`s0_check` validates fixtures, generated contracts, and tests. Export schemas after changing contract types; `--check` detects stale exports. The local server exposes the prototype at `/` and API documentation at `/docs`. No frontend build is required.
+`s0_check` validates fixtures, generated contracts, and tests. Export schemas after changing contract types; `--check` detects stale exports. The command above starts the historical mock. The product demo uses `start-demo.cmd` or `python -m scripts.movie_demo`, builds `web/app`, and serves the product plus API documentation at `/docs`.
 
 ## Coding Style & Naming Conventions
 

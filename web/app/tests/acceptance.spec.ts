@@ -62,8 +62,7 @@ async function submit(page: Page, name: string | RegExp = "看看候选电影") 
 }
 test.beforeEach(async ({ page }) => {
   expect(
-    (await (await page.request.get("http://127.0.0.1:8000/health")).json())
-      .synthetic_fallback,
+    (await (await page.request.get("/api/health")).json()).synthetic_fallback,
   ).toBe(false);
   await page.goto("/");
   // A cold real catalog can load until the client's 45-second request timeout.
@@ -344,17 +343,22 @@ test("system theme changes immediately, keyboard focus and narrow layout", async
   await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
   await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   await submit(page);
-  await page.setViewportSize(
-    info.project.name.startsWith("mobile")
-      ? { width: 320, height: 720 }
-      : { width: 1920, height: 1080 },
-  );
-  await noOverflow(page);
-  await accessible(page);
-  await page.screenshot({
-    path: `${screenshots}/${info.project.name}-${info.project.name.startsWith("mobile") ? "320" : "1920"}.png`,
-    fullPage: true,
-  });
+  try {
+    await page.setViewportSize(
+      info.project.name.startsWith("mobile")
+        ? { width: 320, height: 720 }
+        : { width: 1920, height: 1080 },
+    );
+    await noOverflow(page);
+    await accessible(page);
+    await page.screenshot({
+      path: `${screenshots}/${info.project.name}-${info.project.name.startsWith("mobile") ? "320" : "1920"}.png`,
+      fullPage: true,
+    });
+  } finally {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    expect(page.viewportSize()).toEqual({ width: 1440, height: 1000 });
+  }
 });
 test("stalled artwork times out and can be retried without losing the film", async ({
   page,
@@ -423,6 +427,12 @@ test("unknown identities and scope documentation remain explicit", async ({
   page,
 }) => {
   await page.goto("/film/itunes%3A1");
+  await expect(page.getByRole("alert")).toBeVisible();
+  if ((await page.getByRole("alert").innerText()).includes("一分钟后重试")) {
+    test.setTimeout(180000);
+    await page.waitForTimeout(61000);
+    await page.getByRole("button", { name: "重新尝试", exact: true }).click();
+  }
   await expect(page.getByRole("alert")).toContainText("影片");
   await page.goto("/about");
   const scopeTable = page

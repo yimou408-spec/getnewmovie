@@ -1,5 +1,6 @@
 """Real catalog API. Start: python -m uvicorn scripts.movie_server:app --port 8000."""
 from uuid import uuid4
+from pathlib import Path
 from collections import OrderedDict
 from threading import Lock
 from urllib.parse import urlparse
@@ -8,8 +9,8 @@ import time
 
 import httpx
 
-from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from scripts.movie_catalog import AppleCatalog, CatalogError, MOODS
 from scripts.movie_ranking import MOOD_CLUES
@@ -17,47 +18,57 @@ from scripts.mvp_recommendation_rules import MovieSelection, select_movies
 from scripts.mvp_model import ModelAdapter, ModelSettings
 from scripts.mvp_workflow import AgentContext, AgentWorkflow
 from scripts.movie_intent import IntentSessions, explain
+from scripts.movie_config import ROOT, Settings
+from scripts.movie_model import RuntimeInterpreter
+from scripts.movie_tmdb import TMDBCatalog
+from scripts.movie_sources import CatalogRouter
 from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
-                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities, SessionResponse)
+                                  MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, RuntimeConfiguration, ServiceCapabilities, SessionResponse)
 
 
-def create_app(catalog=None, *, model_factory=None):
-    if catalog is None and model_factory is None:
-        settings = ModelSettings.from_env()
-        if settings is not None:
-            model_factory = lambda: ModelAdapter(settings, max_requests=1)
-    catalog = catalog or AppleCatalog()
-    sessions = IntentSessions()
+def create_app(catalog=None, *, model_factory=None, settings=None, frontend_dir=None, intent_parser=None, backup_catalog=None):
+    settings = settings or Settings.load()
+    catalog = catalog or (TMDBCatalog(settings.tmdb_read_token) if settings.provider == "tmdb" else AppleCatalog())
+    catalog = CatalogRouter(catalog, backup_catalog)
+    parser = intent_parser
+    if parser is None and model_factory is None and settings.report().llm.state == "configured":
+        parser = RuntimeInterpreter(settings)
+        model_factory = lambda: parser
+    sessions = IntentSessions(parser=intent_parser)
     agent_contexts = {}
     workflow = AgentWorkflow(catalog, model_factory) if model_factory else None
     artwork_cache = OrderedDict()
     artwork_lock = Lock()
     app = FastAPI(title="Tonight movie catalog", version="0.1.0", description="Apple US real charts. Rule-based matching, no synthetic fallback.")
+    router = APIRouter()
 
     @app.exception_handler(CatalogError)
     async def source_error(request: Request, exc: CatalogError):
         return JSONResponse(status_code=exc.status, content=ErrorResponse(trace_id=uuid4().hex, data_mode="live",
             code=exc.code, message=exc.message, retryable=exc.status >= 500).model_dump(mode="json"))
 
-    @app.post("/sessions", response_model=SessionResponse)
+    @router.post("/sessions", response_model=SessionResponse)
     def create_session():
         return SessionResponse(session_id=sessions.create(), expires_in_seconds=sessions.ttl)
 
-    @app.get("/health", response_model=HealthResponse)
+    @router.get("/health", response_model=HealthResponse)
     def health():
-        return HealthResponse(service="real-catalog", provider="Apple iTunes US", synthetic_fallback=False,
-                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, natural_language=True,
+        return HealthResponse(service="real-catalog", provider=catalog.source_name, synthetic_fallback=False,
+                              cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, ratings=catalog.id_prefix == "tmdb", natural_language=True,
                                                                                       model_understanding=workflow is not None))
 
-    def find(mid):
-        if not mid.startswith("itunes:"):
-            raise CatalogError("NOT_FOUND", "影片不在当前真实片库中，请重新查找。", 404)
-        found = catalog.lookup([mid.removeprefix("itunes:")])
-        if not found:
-            raise CatalogError("NOT_FOUND", "资料源未返回这部影片。", 404)
-        return found[0]
+    @router.get("/configuration", response_model=RuntimeConfiguration)
+    def configuration():
+        report = settings.report()
+        if parser is not None and hasattr(parser, "verification"):
+            report = report.model_copy(update={"llm": report.llm.model_copy(update=parser.verification())})
+        return report.model_copy(update={"catalog_provider": "tmdb" if catalog.id_prefix == "tmdb" else "apple",
+                                         "catalog_fallback_active": bool(catalog.failed_until)})
 
-    @app.get("/artwork/{movie_id}", include_in_schema=False)
+    def find(mid):
+        return catalog.find(mid)
+
+    @router.get("/artwork/{movie_id}", include_in_schema=False)
     def artwork(movie_id: str):
         # Only catalog-owned IDs can resolve artwork; callers never supply a URL.
         with catalog.lock:
@@ -99,7 +110,7 @@ def create_app(catalog=None, *, model_factory=None):
                 artwork_cache.popitem(last=False)
         return Response(data, media_type=media_type, headers=headers)
 
-    @app.post("/recommendations", response_model=RecommendationResponse, responses={503: {"model": ErrorResponse}, 504: {"model": ErrorResponse}})
+    @router.post("/recommendations", response_model=RecommendationResponse, responses={503: {"model": ErrorResponse}, 504: {"model": ErrorResponse}})
     def recommendations(body: RecommendationRequest):
         agent_result = None
         workflow_before = catalog.fetch_count
@@ -131,9 +142,11 @@ def create_app(catalog=None, *, model_factory=None):
         else:
             interpretation, clarification_id, questions = (sessions.resolve(body) if body.input_source == "natural_language"
                                                            else (explain(body.constraints), None, []))
+        model_warnings = (["模型暂时不可用或条件核对未通过，本次已使用规则解析常见条件；未识别要求仍需确认，点选条件继续生效。"]
+                          if body.input_source == "natural_language" and parser is not None and interpretation.method == "rules-v1" else [])
         if questions:
             return RecommendationResponse(trace_id=uuid4().hex, data_mode="live", status="needs_clarification",
-                candidates=[], evidence=[], questions=questions, warnings=["尚未查询片库。请确认冲突或无法执行的要求，也可以修改输入重新提交。"],
+                candidates=[], evidence=[], questions=questions, warnings=model_warnings + ["尚未查询片库。请确认冲突或无法执行的要求，也可以修改输入重新提交。"],
                 memory_used=False, interpretation=interpretation, clarification_id=clarification_id)
         with catalog.lock:
             before = workflow_before if agent_result is not None else catalog.fetch_count
@@ -152,10 +165,18 @@ def create_app(catalog=None, *, model_factory=None):
             eligible = selection.eligible
             candidates, evidence = [], []
             for movie, at in selection.candidates:
-                eid = f"apple-{movie.movie_id.split(':')[1]}"
-                facts = f"Apple 美国区分类：{'、'.join(movie.genres)}；正片时长：{movie.runtime_minutes or '未知'} 分钟。"
-                facts += f"导演：{movie.director or '未知'}；美国内容分级：{movie.content_advisory or '未知'}。"
-                evidence.append(Evidence(evidence_id=eid, movie_id=movie.movie_id, source="Apple iTunes US", url=movie.source_url or "https://itunes.apple.com/us/", retrieved_at=at, kind="metadata", claim=facts, spoiler_level="safe"))
+                prefix = movie.movie_id.split(':', 1)[0]
+                source = "TMDB" if prefix == "tmdb" else "Apple iTunes US"
+                eid = f"{'tmdb' if prefix == 'tmdb' else 'apple'}-{movie.movie_id.split(':')[1]}"
+                facts = f"{source} 分类：{'、'.join(movie.genres) or '未知'}；正片时长：{movie.runtime_minutes or '未知'} 分钟。"
+                facts += f"导演：{movie.director or '未知'}。"
+                if prefix == "itunes":
+                    facts += f"美国内容分级：{movie.content_advisory or '未知'}。"
+                evidence.append(Evidence(evidence_id=eid, movie_id=movie.movie_id, source=source, url=movie.source_url or "https://itunes.apple.com/us/", retrieved_at=at, kind="metadata", claim=facts, spoiler_level="safe"))
+                for rating in movie.ratings:
+                    evidence.append(Evidence(evidence_id=rating.evidence_id, movie_id=movie.movie_id, source=rating.source,
+                        url=movie.source_url, retrieved_at=at, kind="rating", spoiler_level="safe",
+                        claim=f"{rating.source} 用户评分 {rating.value}/{rating.scale}，{rating.vote_count or 0} 人投票；不代表个人喜爱概率。"))
                 match = [f"类型符合：{'、'.join(c.genres)}。"] if c.genres else []
                 if c.moods:
                     clues = set().union(*(MOOD_CLUES[m] for m in c.moods)) & set(movie.tags)
@@ -176,7 +197,13 @@ def create_app(catalog=None, *, model_factory=None):
                 candidates.append(Candidate(movie=movie, reason=Reason(text="".join(match), evidence_ids=[eid], kind="matching_inference"),
                     caveats=caveats,
                     availability=[Availability(region=body.region, status="unknown")]))
-            warnings = ["范围：Apple 美国区当前分类榜单；片名沿用来源原文。评分及所选地区播放渠道未接入。",
+            prefixes = {m.movie_id.split(':', 1)[0] for m, _ in films} or {catalog.id_prefix}
+            scopes = []
+            if 'tmdb' in prefixes:
+                scopes.append("范围：TMDB 热门候选，单次最多 8 部；中文资料可能缺失。用户评分来自 TMDB，所选地区播放渠道未接入。")
+            if 'itunes' in prefixes:
+                scopes.append("范围：Apple 美国区当前分类榜单；片名沿用来源原文。评分及所选地区播放渠道未接入。")
+            warnings = model_warnings + (catalog.warnings if 'itunes' in prefixes else []) + scopes + [
                         "类型、片长、年代和排除是硬条件；心情只辅助召回与排序，未知字段不进入对应限定结果。",
                         "排序：来源顺序，不代表口碑或适合程度。" if c.sort_by == "popular" else "排序：均衡探索。简介关键词辅助心情匹配，并分散类型和导演；无偏好时降低恐怖类别优先级。这不是评分或个人喜爱概率。"]
             if c.company:
@@ -195,24 +222,42 @@ def create_app(catalog=None, *, model_factory=None):
                 catalog_size=agent_result.catalog_size if agent_result is not None else len(films),
                 matched_count=agent_result.matched_count if agent_result is not None else len(eligible), interpretation=interpretation)
 
-    @app.get("/movies", response_model=MovieSearchResponse)
+    @router.get("/movies", response_model=MovieSearchResponse)
     def movies(query: str = Query(min_length=1, max_length=100), year: int | None = None):
         with catalog.lock:
             before = catalog.fetch_count
             found = catalog.search(query.strip(), year)
             return MovieSearchResponse(data_mode="cached" if before == catalog.fetch_count else "live", movies=[m for m, at in found], requires_confirmation=len(found)>1)
 
-    @app.get("/movies/{movie_id}", response_model=Movie, responses={404: {"model": ErrorResponse}})
+    @router.get("/movies/{movie_id}", response_model=Movie, responses={404: {"model": ErrorResponse}})
     def movie(movie_id: str):
         with catalog.lock:
             return find(movie_id)[0]
 
-    @app.post("/comparisons", response_model=MovieSearchResponse)
+    @router.post("/comparisons", response_model=MovieSearchResponse)
     def comparisons(body: ComparisonRequest):
         with catalog.lock:
             before = catalog.fetch_count
             found = [find(mid)[0] for mid in body.movie_ids]
             return MovieSearchResponse(data_mode="cached" if before == catalog.fetch_count else "live", movies=found, requires_confirmation=False)
+
+    app.include_router(router)
+    app.include_router(router, prefix="/api", include_in_schema=False)
+    folder = Path(frontend_dir or ROOT / "web/app/dist").resolve()
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str):
+        parts = Path(path).parts
+        if (parts and parts[0] == "api") or any(part.startswith(".") for part in parts):
+            raise HTTPException(404)
+        file = (folder / path).resolve()
+        if file.is_relative_to(folder) and file.is_file():
+            return FileResponse(file)
+        if file.is_relative_to(folder) and not Path(path).suffix and (not parts or parts[0] != "assets"):
+            index = folder / "index.html"
+            if index.is_file():
+                return FileResponse(index, headers={"Cache-Control": "no-cache"})
+        raise HTTPException(404)
 
     return app
 

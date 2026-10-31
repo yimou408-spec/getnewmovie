@@ -119,7 +119,7 @@ class AgentWorkflow:
             return self._error(state, "WORKFLOW_TIMEOUT")
         if result.status != "ok":
             return self._error(state, "MODEL_" + result.status.upper())
-        return {"intent": result.intent, "method": "llm-v1"}
+        return {"intent": result.intent, "method": result.metadata.get("method", "llm-v1")}
 
     def _resolve(self, state):
         if state.get("confirmed"):

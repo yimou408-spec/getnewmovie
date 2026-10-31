@@ -1,0 +1,67 @@
+.setup-summary,
+.setup-guide {
+  padding: 24px;
+  margin-block: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  line-height: 1.7;
+}
+.setup-summary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.setup-summary h2,
+.setup-guide h2 {
+  margin-top: 0;
+}
+.setup-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.setup-cards article {
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.setup-warning {
+  color: var(--warning);
+}
+.setup-guide ol {
+  padding-left: 24px;
+}
+.setup-guide li {
+  margin-block: 18px;
+  padding-left: 4px;
+}
+.setup-guide a svg {
+  display: inline;
+  vertical-align: middle;
+}
+.setup-guide code {
+  overflow-wrap: anywhere;
+}
+.setup-command {
+  display: grid;
+  gap: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .setup-cards {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .setup-summary,
+  .setup-guide {
+    padding: 18px;
+  }
+  .setup-summary-heading {
+    flex-wrap: wrap;
+  }
+}
