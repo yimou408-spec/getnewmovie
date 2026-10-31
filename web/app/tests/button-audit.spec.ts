@@ -536,6 +536,14 @@ test("audit: search, detail, comparison and health retries recover against real 
       : route.continue(),
   );
   await page.getByRole("link", { name: "查看接入状态", exact: true }).click();
+  // The header already cached healthy data. Reload to exercise the injected
+  // endpoint failure instead of depending on the 30-second cache expiring.
+  const failedHealth = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/health") && response.status() === 503,
+  );
+  await page.reload();
+  await failedHealth;
   await expect(page.getByRole("alert")).toBeVisible();
   failHealth = false;
   await page.getByRole("button", { name: "重新尝试", exact: true }).click();
