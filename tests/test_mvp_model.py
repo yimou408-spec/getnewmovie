@@ -166,3 +166,20 @@ def test_default_env_path_is_independent_of_current_directory(monkeypatch, tmp_p
     another_dir.mkdir()
     monkeypatch.chdir(another_dir)
     assert ModelSettings.from_env().api_key == "file-secret"
+
+
+def test_text_interpreter_does_not_receive_conflicting_structured_picks():
+    from scripts.s0_contracts import Constraints
+    def handle(request):
+        payload = json.loads(request.content)
+        user = json.loads(payload['messages'][1]['content'])
+        # Picks are merged and compared by deterministic code after text parsing.
+        assert user['query'] == '喜剧，120分钟以内'
+        assert 'selected_constraints' not in user
+        assert '恐怖' not in payload['messages'][1]['content']
+        return httpx.Response(200, json=response(json.dumps({'action': 'recommend',
+            'updates': {'genres': ['喜剧'], 'max_runtime_minutes': 120}})))
+    with httpx.Client(transport=httpx.MockTransport(handle)) as client:
+        result = ModelAdapter(settings(), client=client).interpret('喜剧，120分钟以内',
+            picks=Constraints(genres=['恐怖']))
+    assert result.status == 'ok' and result.intent.updates.genres == ['喜剧']

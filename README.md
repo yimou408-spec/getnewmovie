@@ -20,6 +20,8 @@ MVP模型配置写在项目根目录 `.env`：填写 `LLM_BASE_URL`、`LLM_MODEL
 
 ## 前端、验收与团队进度
 
+2026-11-01模型验收更新：本机配置已生效；修复文字/点选冲突被模型混淆的问题，提示词升级`mvp-intent-v2`。真实DeepSeek＋Apple＋临时记忆17项接口检查、桌面/手机4项页面场景通过，本机M11已收口；超时恢复使用明确标记的本地故障注入。复现：`python -m scripts.mvp_acceptance --live --max-model-requests 4`。[模型验收记录](docs/MVP开发工作记录.md#2026-11-01--m11本机模型与交互验收收口)。另一环境签收与真实多源口碑仍待完成，旧服务需重启才读取新配置。
+
 - **[打开真实前端预览](https://standards-float-heather-promotional.trycloudflare.com/)**：本轮有效至 **2026-10-23 12:50 北京时间**，非永久部署；中断或到期后的重启方法见报告。
 - **[最新验收报告与三人进度对齐](docs/frontend/acceptance-20261023.md)**：直接阅读，无需下载 Actions 压缩包。列明版本、真实操作、CI 证据、未通过项和每位组员待交付事项。
 - [PR #4](https://github.com/yimou408-spec/getnewmovie/pull/4) · [云端预览运行](https://github.com/yimou408-spec/getnewmovie/actions/runs/39898294228) · [前端详细文档](docs/frontend/README.md)

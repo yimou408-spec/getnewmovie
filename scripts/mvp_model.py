@@ -14,7 +14,7 @@ from scripts.mvp_intent_contracts import IntentDecision, TurnContext
 from scripts.s0_contracts import Constraints
 from app.services.budget import consume
 
-PROMPT_VERSION = "mvp-intent-v1"
+PROMPT_VERSION = "mvp-intent-v2"
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
@@ -61,14 +61,14 @@ def build_messages(query, context, picks):
 类型、心情按Schema枚举归一化：科幻归为科幻与奇幻，轻松归为轻松解压。心情只是软偏好。
 首次请求action=recommend；有上一轮条件且用户补充/修改要求时为refine；换一组为reroll；重新开始为reset。
 补充条件只更新提到的项；列表更新需要包含本次应保留的完整列表，不要丢失已有排除。
-明确更新上一轮时长不是矛盾；同次点选与文字不一致或同时要求并排除同类时记录conflicts，不擅自选择。
+明确更新上一轮时长不是矛盾；同一段文字同时要求并排除同类时记录conflicts，不擅自选择。
+仅解析本轮文字；点选条件由后续代码合并并检测冲突，不要推测或替用户选择点选条件。
 评分阈值、地区可播放、复杂相似片等本轮无法执行的要求写入unhandled，不假装已经满足。
 今天不想看仅为本次排除；不推断成永久偏好。未指定条件不编造。
 示例输入：喜剧，两个小时以内。示例JSON：
 {"action":"recommend","updates":{"genres":["喜剧"],"max_runtime_minutes":120},"conflicts":[],"unhandled":[]}
 输出Schema：""" + schema
-    user = json.dumps({"query": query, "context": context.model_dump(exclude_unset=True),
-                       "selected_constraints": picks.model_dump(exclude_unset=True)}, ensure_ascii=False)
+    user = json.dumps({"query": query, "context": context.model_dump(exclude_unset=True)}, ensure_ascii=False)
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
