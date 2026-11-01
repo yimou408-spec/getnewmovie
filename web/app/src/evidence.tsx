@@ -140,6 +140,12 @@ function EvidenceEntry({ entry, cited }: { entry: Evidence; cited: boolean }) {
           {cited ? " · 理由引用" : ""}
         </span>
       </div>
+      {entry.kind === "review" && (
+        <p className="muted">
+          作者：{entry.author || "未提供"}
+          {entry.granularity === "excerpt" ? " · 原文摘录" : ""}
+        </p>
+      )}
       {safe || reveal ? (
         <p className={entry.kind === "review" ? "source-opinion" : ""}>
           {entry.claim}
@@ -223,7 +229,9 @@ export function EvidenceOverview({
       {dataMode === "cached" && (
         <p className="notice">本次使用缓存证据，请核对每条采集时间。</p>
       )}
-      {entries.some((entry) => entry.source === "TMDB") && <TMDBAttribution />}
+      {entries.some((entry) =>
+        ["TMDB", "TMDB Reviews"].includes(entry.source),
+      ) && <TMDBAttribution />}
       <div className="evidence-coverage">
         <strong>
           {sites.length === 0

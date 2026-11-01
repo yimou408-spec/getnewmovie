@@ -18,6 +18,7 @@ from scripts.movie_catalog import AppleCatalog
 from scripts.movie_server import create_app
 from scripts.s0_contracts import RecommendationResponse
 from scripts.tmdb_adapter import TMDBSource
+from scripts.tmdb_reviews import TMDBReviewSource
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -61,9 +62,48 @@ def evaluate_responses(first, second, movie_ids):
     return checks
 
 
+def evaluate_review_responses(first, second, movie_ids):
+    """A review acquisition gate, never a multi-source opinion acceptance."""
+    checks = {"http_success": first.status_code == second.status_code == 200}
+    if not checks["http_success"]:
+        return checks
+    try:
+        a, b = [RecommendationResponse.model_validate(r.json()).model_dump(mode="json")
+                for r in (first, second)]
+    except ValueError:
+        return {**checks, "response_contract": False}
+    checks["response_contract"] = True
+    expected = set(movie_ids)
+    candidates = {c["movie"]["movie_id"]: c for c in b["candidates"]}
+    checks["mapped_candidates"] = expected <= candidates.keys() and all(
+        any(link["provider"] == "tmdb" and link["status"] == "confirmed"
+            for link in candidates[mid]["movie"].get("external_ids") or []) for mid in expected)
+    shared = {e["evidence_id"]: e for e in b["evidence"]}
+    records = [r for r in b["source_results"] if r["source"] == "TMDB Reviews" and r["movie_id"] in expected]
+    checks["review_coverage"] = expected <= {r["movie_id"] for r in records} and all(
+        r["status"] == "ok" and r["evidence"] and r["cache_status"] == "fresh" for r in records)
+    checks["same_movie_attributed_excerpts"] = bool(records) and all(
+        e["movie_id"] == r["movie_id"] and e["source"] == "TMDB Reviews"
+        and e["kind"] == "review" and e["granularity"] == "excerpt"
+        and bool(e.get("author")) and e["usage_basis"] == "provider_terms"
+        and len(e["claim"]) <= 600 and bool(re.fullmatch(r"[a-f0-9]{24}", e.get("source_content_id") or ""))
+        and e["url"] == f"https://www.themoviedb.org/review/{e['source_content_id']}"
+        and shared.get(e["evidence_id"]) == e for r in records for e in r["evidence"])
+    reviews = [e for r in records for e in r["evidence"]]
+    checks["spoilers_and_independence_not_inferred"] = bool(reviews) and all(
+        e["spoiler_level"] == "unknown" and e.get("independent_source_group") is None for e in reviews)
+    ids = {e["evidence_id"] for e in reviews}
+    checks["reviews_not_default_reasons"] = all(
+        not ids.intersection(c["reason"]["evidence_ids"]) for c in b["candidates"])
+    checks["second_request_zero_http"] = second.headers.get("x-upstream-calls") == "0"
+    checks["no_memory_used"] = not a["memory_used"] and not b["memory_used"]
+    return checks
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
+    parser.add_argument("--reviews", action="store_true", help="Check bounded review acquisition instead of metadata-only acceptance")
     parser.add_argument("--movie-id", action="append", default=[])
     parser.add_argument("--database", type=Path, default=Path(os.getenv("MOVIE_DB_PATH") or ROOT / "artifacts/state/movie.sqlite3"))
     parser.add_argument("--output", type=Path, default=ROOT / "artifacts/tmdb-mapping/recommendation-smoke.json")
@@ -88,14 +128,17 @@ def main():
             if not any(link.provider == "tmdb" and link.status == "confirmed" for link in repo.mappings(mid)):
                 print("NOT_CONFIGURED: each movie needs a confirmed TMDB mapping; no HTTP requests made.")
                 return 2
-        service = EvidenceService(repo, {"tmdb": TMDBSource(token)})
+        adapters = {"tmdb": TMDBSource(token)}
+        if args.reviews:
+            adapters["tmdb_reviews"] = TMDBReviewSource(token)
+        service = EvidenceService(repo, adapters)
         body = dict(mode="watchlist", query="核验已确认影片资料", session_id="tmdb-live-smoke",
                     memory_enabled=False, watchlist_movie_ids=args.movie_id)
         with TestClient(create_app(catalog, repository=repo, evidence_service=service)) as client:
             first = client.post("/recommendations", json=body)
             second = client.post("/recommendations", json=body)
-        checks = evaluate_responses(first, second, args.movie_id)
-        report = {"mode": "live_apple_tmdb_no_model", "checked_at": datetime.now(timezone.utc).isoformat(),
+        checks = (evaluate_review_responses if args.reviews else evaluate_responses)(first, second, args.movie_id)
+        report = {"mode": "live_apple_tmdb_reviews_no_model" if args.reviews else "live_apple_tmdb_no_model", "checked_at": datetime.now(timezone.utc).isoformat(),
                   "checks": checks, "passed": all(checks.values()), "requests": []}
         for response in (first, second):
             try:
@@ -104,10 +147,17 @@ def main():
                     data = {}
             except ValueError:
                 data = {}
+            # A report needs identity, scope and counts, not third-party prose.
+            evidence = data.get("evidence", [])
+            sources = data.get("source_results", [])
+            if args.reviews:
+                evidence = [{k: v for k, v in e.items() if k != "claim"} for e in evidence]
+                sources = [{**r, "evidence": [{k: v for k, v in e.items() if k != "claim"}
+                            for e in r["evidence"]]} for r in sources]
             report["requests"].append({"status": response.status_code,
                 "http_calls": int(response.headers.get("x-upstream-calls", 0)),
-                "candidates": data.get("candidates", []), "evidence": data.get("evidence", []),
-                "source_results": data.get("source_results", []), "error_code": data.get("code")})
+                "candidates": data.get("candidates", []), "evidence": evidence,
+                "source_results": sources, "error_code": data.get("code")})
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({"report": str(args.output), "passed": report["passed"], "checks": checks,

@@ -220,3 +220,36 @@ python -m scripts.tmdb_acceptance --live --movie-id itunes:1886817811 --movie-id
 - 按TDD追加7项用例：无令牌/无映射数据库/无已确认映射时零网络，HTTP失败、非法JSON、缺失响应字段、空证据、错片、错误TMDB内容ID不通过。复现验收器直接抛JSON/字段异常及内容ID不一致误判通过后修复：先按RecommendationResponse校验响应，额外绑定source_content_id与已确认外部ID及来源URL；异常标失败，不写原始错误正文。合计9项验收脚本测试通过。
 - 最终`s0_check`196项通过，契约检查通过；本次仅后端验收器改动，无前端变更，沿用上一节39项单测及真实页面证据。
 - 修复后真实复验报告`artifacts/tmdb-mapping/recommendation-smoke-negative-fix.json`，新增响应契约检查后9项全部通过；两次请求上游计数为2/0（两部Apple lookup；TMDB资料命中先前缓存），零模型/豆瓣请求。保留前次4/0冷TMDB缓存结果，不用本次缓存复验冒充新采集。
+
+## 2026-11-01：影评获取增量与最终验收复查
+
+- 用户要求“先提交并推送，再把验收完成”。已先提交并推送`fd28138`至`origin/feat/backend-persistence-evidence`，远程哈希复查一致；无关`.vscode/`保持未跟踪。本节记录其后的增量，未把缺配置或访问失败项目填成通过。
+- 官方依据：[影评接口](https://developer.themoviedb.org/reference/movie-reviews)、[API条款](https://www.themoviedb.org/documentation/api/terms-of-use)、[非商业使用与署名FAQ](https://developer.themoviedb.org/docs/faq)，本轮均HTTP200。现有署名继续有效。非商业原型有限摘录标记provider_terms，不代表商业授权。
+- 新增`scripts/tmdb_reviews.py`与`MOVIE_TMDB_REVIEWS_LIVE=1`可选接线；需进程`TMDB_READ_TOKEN`，且`MOVIE_TMDB_LIVE`未关闭。默认不取影评，只对已确认TMDB映射请求英文第一页，一次HTTP、最多3条、600字符/条，无重试/跳转。与metadata使用不同来源名`TMDB Reviews`和缓存键，复用30分钟TTL及共享预算。
+- 校验影片ID、24位内容ID、固定原文URL、作者及纯文本范围；拒绝含HTML/链接/控制字符的材料，去重，不读取用户头像/个人主页/个人评分。保留作者、内容ID、采集时间、原文链接和excerpt粒度；独立来源组为空、spoiler_level=unknown，不能进入默认推荐理由。页面显示作者和“原文摘录”，主动展开后才显示正文；来源能力状态只表示配置了实现，不保证每片上游可用。
+
+### 样本、映射与真实结果
+
+- 英文影评10部覆盖探索（每片1次HTTP，首屏，不存正文）：TMDB 11104、843、129、550、155、238、27205、496243共8部有记录；1144107和9463两部为0，保留缺失分母。报告`artifacts/tmdb-mapping/review-discovery.json`仅存ID/作者/URL/字符数；没有据此推断独立原创、低剧透或创建Apple映射。重庆森林/花样年华的Apple US直接搜索仍空；火影忍者317442可核对作品资料但影评0，均未为凑覆盖登记。
+- 《黑天鹅》Apple [407742758](https://itunes.apple.com/us/movie/black-swan/id407742758)与TMDB [44214](https://www.themoviedb.org/movie/44214)：同名、2010年、导演Darren Aronofsky一致，Apple109分钟、TMDB108分钟；确认作品级对应，仍保留Apple硬过滤字段。核验者为Codex代理，basis=multi_field_verified。精选资料保留`artifacts/tmdb-mapping/drama-identity-candidates.json`与`black-swan-identity.json`；登记前备份`artifacts/backups/pre-review-map-20261101.sqlite3`，没有改动个人偏好。
+- 真实取得1条BonStevenson影评，内容ID`5da63e4ee6d3cc0015abbbf4`，原文[链接](https://www.themoviedb.org/review/5da63e4ee6d3cc0015abbbf4)，摘录320字符。仅证明这个作者样本可取得，不确认独立原创，不概括全网口碑。正文只按原型缓存策略本机保存，验收报告不写claim字段。
+- `tmdb_acceptance --reviews`9项通过：HTTP、响应契约、映射候选、影评覆盖/缓存、同片作者与原文URL绑定、未推断剧透/独立性、未进入默认理由、第二次零HTTP、未用记忆。报告`artifacts/tmdb-mapping/review-recommendation-smoke.json`；首次3次HTTP（Apple详情/TMDB资料/影评各1），第二次0次。
+- Chrome桌面浅色与手机深色真实页面2/2通过：影片详情加入片单、从片单推荐、来源面板核对影评作者、正文默认隐藏、主动展开/收起、原文链接与署名、Axe及无横向溢出。截图[桌面](../frontend/screenshots/tmdb-20261101/desktop-light-review-live.png)、[手机](../frontend/screenshots/tmdb-20261101/mobile-dark-review-live.png)已查看，截图正文收起。测试Chrome先卡本地导航，使用本次测试进程`--no-proxy-server`后恢复，未更改系统代理；初次脚本未展开筛选面板导致按钮定位失败，修正后完成真实链路。临时脚本/配置在`artifacts/tmdb-mapping/review-ui.*`。预览8013独立启动、模型/豆瓣禁用。
+
+复现（核对映射依据后，使用自己的Python）：
+
+```powershell
+python -m scripts.backend_admin map --movie-id itunes:407742758 --provider tmdb --external-id 44214 --basis multi_field_verified --confirmed
+python -m scripts.tmdb_acceptance --live --reviews --movie-id itunes:407742758 --output artifacts/tmdb-mapping/review-recommendation-smoke.json
+# 真实页面需在启动进程额外设置；变更后重启后端
+$env:MOVIE_TMDB_REVIEWS_LIVE = '1'
+```
+
+### 未通过条件与接续
+
+- 豆瓣本轮显式live复验9次HTTP：3个身份候选、6次安全验证跳转、0评分/0影评，报告`artifacts/douban/final-20261101-report.json`。未绕过限制；没有真实豆瓣评价材料，故“豆瓣＋独立第二来源对照”、观点共识/分歧综合及10部同片评价验收未通过。需要来源方允许的实际可用数据通路；不以TMDB metadata、两个站点或两个用户名代替独立评价证明。
+- M11：项目`.env`、当前进程及Windows User均未检测到完整LLM_BASE_URL/LLM_MODEL/LLM_API_KEY；运行`mvp_probe_model --live --case E02 --max-requests 1`返回NOT_CONFIGURED，零模型HTTP。已请用户本机配置，密钥无需发聊天；配置到齐后先限1次E02，再做真实冲突确认、失败恢复及记忆启用/关闭/改删与refine/reroll联动，记录请求与响应model。现阶段无法完成真实模型验收。
+- M12：同机测试不代替另一成员/另一主机复现或最终人工签收。此次GitHub公开API查询仓库Actions返回404（无认证），没有新的CI通过结论；之前账户计费限制保留为历史问题，不能据旧报错误判本次CI状态。
+- 本轮无新增依赖或契约字段变化；TDD先见缺模块/缺验收函数/缺作者UI与health能力失败，再实现。最终自动检查记录追加在下方；通过范围为工程、TMDB单源影评获取和本机真实页面，完整产品验收仍未通过。
+
+最终工程结果：`python -m scripts.s0_check` **220 passed**（示例、30+30种子、契约与后端测试）；前端 **40 passed**，`npm run build`、`format:check`、`types:check`均通过；`git diff --check`通过，数据库integrity=ok/schema=3。真实影评推荐9项、Chrome页面2项通过，零付费模型HTTP。测试与截图对应本节代码增量；临时报告和数据库未纳入Git。完整验收结论：**未达到**，剩余条件为真实模型配置及M11实测、豆瓣可用且可引用的评价通路、独立性核验与口碑对照、M12独立复现/签收。

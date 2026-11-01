@@ -90,3 +90,37 @@ def test_acceptance_missing_database_or_mapping_makes_no_requests(monkeypatch, t
 def test_acceptance_records_http_failure_as_failed_checks():
     error = httpx.Response(503, json={"code": "UPSTREAM_UNAVAILABLE"})
     assert not all(evaluate_responses(error, error, ["itunes:1"]).values())
+
+
+def test_review_acceptance_checks_attribution_cache_binding_and_missing_coverage():
+    import copy
+    from scripts.tmdb_acceptance import evaluate_review_responses
+    from tests.test_tmdb_adapter import mapped_movie
+    from tests.test_tmdb_reviews import source, payload
+    from app.services.evidence import EvidenceService
+    from app.services.storage import Repository
+    from scripts.movie_server import create_app
+    from tests.test_movie_intent import CatalogDouble
+    repo = Repository(':memory:')
+    repo.register_mapping('itunes:101', mapped_movie().external_ids[0])
+    client = TestClient(create_app(CatalogDouble(), repository=repo,
+        evidence_service=EvidenceService(repo, {'tmdb_reviews': source(payload())})))
+    body = dict(mode='discover', query='offline', session_id='legacy')
+    first, second = [client.post('/recommendations', json=body) for _ in range(2)]
+    assert all(evaluate_review_responses(first, second, ['itunes:101']).values())
+    for mutation in ['missing_author', 'no_reviews', 'wrong_review_url', 'stale', 'unsafe_claim']:
+        data = copy.deepcopy(second.json())
+        record = next(r for r in data['source_results'] if r['source'] == 'TMDB Reviews')
+        entry = record['evidence'][0]
+        if mutation == 'missing_author':
+            entry['author'] = None
+        elif mutation == 'no_reviews':
+            record['evidence'] = []
+        elif mutation == 'wrong_review_url':
+            entry['url'] = 'https://www.themoviedb.org/review/' + 'b' * 24
+        elif mutation == 'stale':
+            record['cache_status'] = 'stale'
+        else:
+            entry['spoiler_level'] = 'safe'
+        changed = httpx.Response(200, json=data, headers={'x-upstream-calls': '0'})
+        assert not all(evaluate_review_responses(first, changed, ['itunes:101']).values()), mutation

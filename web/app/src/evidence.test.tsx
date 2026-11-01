@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { EvidenceOverview, Ratings, TMDBAttribution } from "./evidence";
 import { evidenceForMovie, snapshotForComparison } from "./evidence-model";
 import { validateResponse, type Recommendation } from "./domain";
@@ -67,6 +68,27 @@ describe("evidence identity and provenance", () => {
 });
 
 describe("per-film evidence display", () => {
+  it("attributes review excerpts before revealing spoiler-unknown text", async () => {
+    const data = response();
+    const movie = data.candidates[0].movie;
+    const review = {
+      ...data.evidence[0],
+      evidence_id: "offline-review-author",
+      kind: "review" as const,
+      granularity: "excerpt" as const,
+      source: "TMDB Reviews",
+      author: "Offline author",
+      spoiler_level: "unknown" as const,
+      claim: "Invented pacing opinion for this test.",
+    };
+    render(<EvidenceOverview movie={movie} evidence={[review]} />);
+    expect(screen.getByText("作者：Offline author · 原文摘录")).toBeVisible();
+    expect(screen.queryByText(review.claim)).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "仍要展开这条内容" }),
+    );
+    expect(screen.getByText(review.claim)).toBeVisible();
+  });
   it("keeps missing evidence, rating and opinions explicit", () => {
     const movie = { ...response().candidates[1].movie, ratings: [] };
     render(<EvidenceOverview movie={movie} evidence={[]} />);

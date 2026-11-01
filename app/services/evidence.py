@@ -30,6 +30,9 @@ def configured_adapters():
     if token and os.getenv("MOVIE_TMDB_LIVE", "1") == "1":
         from scripts.tmdb_adapter import TMDBSource
         adapters["tmdb"] = TMDBSource(token)
+        if os.getenv("MOVIE_TMDB_REVIEWS_LIVE") == "1":
+            from scripts.tmdb_reviews import TMDBReviewSource
+            adapters["tmdb_reviews"] = TMDBReviewSource(token)
     return adapters
 
 
@@ -52,7 +55,8 @@ class EvidenceService:
         for provider in sorted(providers):
             adapter = self.adapters.get(provider)
             source = getattr(adapter, "source", {"douban": "Douban", "tmdb": "TMDB"}.get(provider, provider))
-            link = next((item for item in movie.external_ids or [] if item.provider == provider), None)
+            identity_provider = getattr(adapter, "identity_provider", provider)
+            link = next((item for item in movie.external_ids or [] if item.provider == identity_provider), None)
             if adapter is None or link is None:
                 results.append(SourceEvidenceResult(movie_id=movie.movie_id, source=source, status="not_configured",
                     warnings=["来源适配或经核验的影片映射尚未配置。未请求来源。 "]))

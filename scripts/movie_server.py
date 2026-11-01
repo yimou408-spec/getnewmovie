@@ -120,7 +120,8 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
     def health():
         return HealthResponse(service="real-catalog", provider="Apple iTunes US", synthetic_fallback=False,
                               cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, natural_language=True, long_term_memory=True,
-                                                                                      model_understanding=workflow is not None))
+                                                                                      model_understanding=workflow is not None,
+                                                                                      reviews="tmdb_reviews" in getattr(evidence_service, "adapters", {})))
 
     def find(mid):
         if not mid.startswith("itunes:"):
