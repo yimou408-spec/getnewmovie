@@ -37,9 +37,13 @@ def configured_adapters(*, token=None):
 
 
 class EvidenceService:
-    def __init__(self, repository, adapters=None, *, ttl=1800, clock=time.time):
+    def __init__(self, repository, adapters=None, *, ttl=1800, clock=time.time, review_audit=None):
         self.repository, self.adapters = repository, adapters or {}
         self.ttl, self.clock, self.lock = ttl, clock, RLock()
+        self.review_audit = review_audit
+
+    def reviewed(self, result):
+        return self.review_audit.apply(result) if self.review_audit else result
 
     def collect(self, movie):
         from scripts.movie_identity import confirm_external_identity
@@ -70,7 +74,7 @@ class EvidenceService:
                 if cached and self.clock() - cached[0] < self.ttl:
                     result = SourceEvidenceResult.model_validate(cached[1])
                     result.cache_status = "fresh"
-                    results.append(result)
+                    results.append(self.reviewed(result))
                     continue
             try:
                 result = SourceEvidenceResult.model_validate(adapter.fetch(movie.movie_id, link.external_id))
@@ -97,5 +101,5 @@ class EvidenceService:
                 result.evidence = SourceEvidenceResult.model_validate(cached[1]).evidence
                 # Stale ratings are not promoted to current movie facts.
                 result.warnings.append("更新失败；保留旧材料及原采集时间，未当作最新证据。")
-            results.append(result)
+            results.append(self.reviewed(result))
         return results

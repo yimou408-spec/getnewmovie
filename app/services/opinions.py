@@ -19,7 +19,7 @@ PHRASES = {
     ("pace", "brisk"): ("节奏明快", "节奏紧凑", "brisk pacing", "fast-paced"),
     ("tone", "light"): ("氛围轻松", "轻松幽默", "light-hearted", "lighthearted"),
     ("tone", "heavy"): ("氛围沉重", "情绪压抑", "emotionally heavy", "bleak atmosphere"),
-    ("acting", "strong"): ("表演出色", "演技出色", "strong performances", "excellent acting"),
+    ("acting", "strong"): ("表演出色", "演技出色", "strong performances", "excellent acting", "support roles are magnificent"),
     ("acting", "weak"): ("表演生硬", "演技生硬", "wooden acting", "weak performances"),
     ("visuals", "strong"): ("画面精美", "视觉出色", "stunning visuals", "beautiful cinematography"),
     ("visuals", "weak"): ("画面粗糙", "视觉粗糙", "poor visuals", "rough visuals"),

@@ -91,6 +91,13 @@ def test_need_for_light_mood_gets_a_cited_caution_from_heavy_tone():
     assert not summary.matches
 
 
+def test_supporting_roles_phrase_is_extracted_without_plot_or_overall_score():
+    a = review(claim='All support roles are magnificent. Invented plot follows.')
+    opinions = extract_opinions([a])
+    assert len(opinions) == 1 and opinions[0].aspect == 'acting'
+    assert opinions[0].quote == 'support roles are magnificent'
+
+
 def test_followup_is_at_most_one_round_and_never_retries_unsafe_or_blocked_materials():
     calls = []
     b = review("b", claim="氛围轻松，节奏明快。", group="original-b")

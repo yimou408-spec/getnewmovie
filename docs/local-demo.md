@@ -92,3 +92,13 @@ git rev-parse HEAD
 `feat/evidence-opinion-synthesis` 新增来源面板的材料观点对照，范围和离线验收见[MVP最新记录](MVP开发工作记录.md#2026-11-01--口碑综合最小实现离线证据验收)。默认只处理已标记安全、可使用的影评受控短语；材料不足/独立性未知就明确降级。当前真实TMDB摘录为剧透未知、无独立组，豆瓣仍无可用评价，不会因此出现“真实多源已核验”。
 
 默认不增加模型调用。若后续要验证远程模型辅助选择，在本机 `.env` 显式设置 `MOVIE_OPINIONS_MODEL=1` 并重启；会把合格影评片段发送给配置的服务商，每次推荐最多一次额外请求，可能计费。本轮未运行真实综合模型；本机Qwen及生产补查来源未接入。开启前仍需有安全且允许使用的材料；该开关不能解除豆瓣限制或自动核验作者独立性。
+
+审核接线可显式设置进程变量 `$env:MOVIE_REVIEW_AUDIT_PATH = 'artifacts/opinions/review-audit.json'` 后重启（此项只读进程变量）。默认不开启。本地JSON登记格式见 `app/services/review_audit.py`：`version: 1`、`decisions`；每项记录影片/来源/证据ID、作者、URL、采集片段SHA-256、逐字连续摘录、剧透决定、审核者及human/agent身份、时间和理由。登记独立组还必须提供原创发布者、原始HTTPS链接和核验理由；不同用户名不能直接充数。登记文件只表达审核者决定，不自动证明其正确，也不提升使用许可。真实正文和审核文件保留在忽略的 `artifacts/`，不要提交。
+
+审核覆盖当前引用片段，不覆盖整篇；上游片段、作者、URL或影片绑定变化时失效。原始采集缓存不保存审核覆盖层，因此删除决定可立即撤销，下次缓存命中也重新审核。失效/损坏文件不提升安全或独立性。复测采集和登记匹配可运行：
+
+```powershell
+python -m scripts.review_acceptance --live --tmdb-id 155 --audit artifacts/opinions/review-audit.json --output artifacts/opinions/review-acceptance.json
+```
+
+此命令读取根目录 `.env`/进程令牌，最多6个明确TMDB ID、每片一次HTTP，无模型调用；保留失败分母，报告省略正文。退出0仅表示该批采集成功，不表示豆瓣、第二独立平台、人工低剧透审核或完整多源验收通过。

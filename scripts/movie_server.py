@@ -48,7 +48,11 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
     repository = repository or Repository((os.getenv("MOVIE_DB_PATH") or Path(__file__).resolve().parents[1] / "artifacts/state/movie.sqlite3") if production else ":memory:")
     if evidence_service is None:
         from app.services.evidence import configured_adapters
-        evidence_service = EvidenceService(repository, configured_adapters(token=settings.tmdb_read_token) if production else {})
+        from app.services.review_audit import ReviewAudit
+        audit_path = os.getenv('MOVIE_REVIEW_AUDIT_PATH')
+        audit = ReviewAudit(ROOT / audit_path) if production and audit_path else None
+        evidence_service = EvidenceService(repository, configured_adapters(token=settings.tmdb_read_token) if production else {},
+                                           review_audit=audit)
     if opinion_factory is None:
         from scripts.opinion_model import configured_opinion_factory
         opinion_factory = configured_opinion_factory(settings) if production else OpinionPipeline
