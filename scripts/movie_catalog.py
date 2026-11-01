@@ -43,6 +43,11 @@ def apple_url(value, artwork=False):
 
 
 class AppleCatalog:
+    base_url = "https://itunes.apple.com"
+    source_name = "Apple iTunes US"
+    id_prefix = "itunes"
+    headers = {}
+
     def __init__(self, client=None, rate_limit=20):
         # Explicit proxy avoids invalid global NO_PROXY entries on Windows.
         self.client = client or httpx.Client(timeout=10, follow_redirects=False, trust_env=False,
@@ -63,11 +68,13 @@ class AppleCatalog:
         if len(self.calls) >= self.rate_limit:
             raise CatalogError("UPSTREAM_RATE_LIMIT", "资料源请求较多，请一分钟后重试；已有结果仍可查看。")
         self.calls.append(now)
-        timeout = consume(search=path == "/search")
+        timeout = consume(search=path in {"/search", "/search/movie"})
         try:
-            response = self.client.get("https://itunes.apple.com" + path, params=params, timeout=timeout)
+            response = self.client.get(self.base_url + path, params=params, headers=self.headers, timeout=timeout)
             if current_budget.get():
                 current_budget.get().check()
+            if response.status_code in (401, 403) and self.id_prefix == "tmdb":
+                raise CatalogError(message="TMDB 暂时拒绝访问，正在使用备用资料源。")
             if response.status_code == 429:
                 raise CatalogError("UPSTREAM_RATE_LIMIT", "资料源暂时限流，请一分钟后重试。")
             response.raise_for_status()

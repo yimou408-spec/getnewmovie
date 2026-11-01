@@ -27,7 +27,10 @@ class RequestLimits:
                 response_started, status = True, message["status"]
                 headers = [(key, value) for key, value in message.get("headers", []) if key.lower() not in {b"x-trace-id", b"x-upstream-calls", b"x-content-type-options"}]
                 headers.extend([(b"x-trace-id", trace_id.encode()), (b"x-upstream-calls", str(budget.http_calls).encode()), (b"x-content-type-options", b"nosniff")])
-                if scope["path"].startswith(("/identities", "/sessions", "/me/", "/feedback")):
+                path = scope["path"]
+                if path.startswith("/api/"):
+                    path = path[4:]
+                if path.startswith(("/identities", "/sessions", "/me/", "/feedback")):
                     headers.append((b"cache-control", b"no-store"))
                 message = {**message, "headers": headers}
             await send(message)

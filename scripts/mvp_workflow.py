@@ -124,7 +124,7 @@ class AgentWorkflow:
             return self._error(state, "WORKFLOW_TIMEOUT")
         if result.status != "ok":
             return self._error(state, "MODEL_" + result.status.upper())
-        return {"intent": result.intent, "method": "llm-v1"}
+        return {"intent": result.intent, "method": result.metadata.get("method", "llm-v1")}
 
     def _resolve(self, state):
         if state.get("confirmed"):
@@ -196,7 +196,9 @@ class AgentWorkflow:
             reroll_excluded = list(dict.fromkeys([*reroll_excluded, *context.displayed]))
         next_context = AgentContext(current_constraints.model_copy(deep=True),
                                     list(dict.fromkeys([*displayed, *(m.movie_id for m, at in selection.candidates)])),
-                                    True, state["method"], reroll_excluded=reroll_excluded,
+                                    True, state["method"],
+                                    pending=context.pending if state.get("confirmed") else None,
+                                    reroll_excluded=reroll_excluded,
                                     explicit_fields=state.get("explicit_fields", []))
         return {"result": WorkflowResult("ready" if selection.candidates else "empty", constraints, next_context,
                                          method=state["method"], candidates=selection.candidates,

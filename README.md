@@ -1,16 +1,27 @@
 # 今晚看什么 · getnewmovie
 
-零输入开始，或点选心情、类型和时长，在真实电影目录中选择、核对来源、加入本次片单及比较。React / TypeScript / Vite 前端随系统切换明暗主题，支持桌面与手机视口。
+从真实电影目录中选择、核对来源、加入本次片单和比较。React / TypeScript / Vite 前端支持独立页面、桌面与手机视口，随系统切换明暗主题；FastAPI 与前端可在本机同一端口运行。
 
-## 当前迭代：五天 Agent MVP
+## 本机展示
 
-2026-10-26 起按五天最小可用范围推进，不指定负责人。已接通模型理解、必要确认、真实目录筛选、理由来源与本次条件调整；10月31日已增量接入明确确认的长期偏好与已看，多源口碑仍待完成。本节为当前迭代入口，下方原分工和验收报告保留作历史参考。
+需要 Windows 10/11 x64 和可访问下载站点、资料源的网络。本分支已整合一键启动、模型理解、条件确认、真实目录、匿名长期偏好与已看；真实多源口碑仍待完成。队友下载完整源码后，在仓库根目录双击 `start-demo.cmd`，或运行：
 
+```powershell
+.\start-demo.cmd
+```
+
+无需预装 Python、Node 或填写 API 密钥。启动器将固定版本的 Python 3.13.9、Node.js 24.11.1 和 uv 0.9.8 安装到项目目录，按锁文件安装依赖、构建前端，打开 http://127.0.0.1:8000/；不需要管理员权限，不修改系统 PATH、代理或执行策略。默认使用 **Apple 美国区真实电影榜单 + 本机 Qwen2.5-1.5B-Instruct Q4_K_M**。首次需下载约 1.1 GB 模型及运行环境、依赖，请保留足够磁盘空间并等待终端进度；中断后再次双击可继续。后续复用本机文件，`git pull` 更新依赖后自动重装对应版本。保留终端窗口，按 Ctrl+C 停止本次演示及它创建的模型进程。端口被占用时保留已有服务，可运行 `start-demo.cmd --port 8001`。
+
+本机模型通过 llama.cpp 运行，只监听回环地址。模型提取受限条件，主分支已有的 **LangGraph** 负责理解、确认、真实目录筛选与本次上下文；电影事实与排序由目录和代码提供。模型下载、启动、请求失败或提取未通过条件核对时，使用规则解析并显示说明；未识别要求仍需确认。可选 TMDB 失败时切换至 Apple 真实资料。所有资料源均失败时保留已有结果并显示可重试错误，不用合成电影补齐。
+
+选片 `/`、片单 `/watchlist`、对比 `/compare`、影片 `/film/:movieId`、偏好 `/preferences`、接入状态 `/about`、配置指引 `/setup` 均可独立打开或刷新。API 文档位于 `/docs`。
+
+- [本地运行与排错](docs/local-demo.md)
+- [本轮免密钥交付与展示验收](docs/frontend/local-setup-acceptance-20261031.md)
+- [MVP任务状态和工作记录](docs/MVP开发工作记录.md)
 - [MVP输入输出与最小接口约定](docs/MVP最小接口约定.md)
-- [任务状态、开发工作记录与接续模板](docs/MVP开发工作记录.md)
-- [M03 模型配置与真实验证操作](docs/MVP开发工作记录.md#m03-setup)
 
-MVP模型配置写在项目根目录 `.env`：填写 `LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`，保存后运行 `python -m scripts.mvp_probe_model --live --case E02 --max-requests 1`。适配器自动读取文件；同名进程环境变量优先。`.env` 保留本机并已被Git忽略。配置完整并重启后端后，首页自然语言走模型和LangGraph；点选仍跳过模型。模型结果下方可继续补充条件、换组和重新开始。
+## 可选配置
 
 2026-10-31后端增量：已加入SQLite匿名身份、明确确认的偏好/已看、反馈幂等与撤销、数据删除、来源状态/TTL及请求预算。打开“偏好与隐私”选择是否启用，默认关闭；本次文字/片单/临时隐藏不会自动成为长期偏好。数据库默认位于忽略路径`artifacts/state/movie.sqlite3`。[接口、备份恢复及验收记录](docs/backend/y02-identities-evidence.md#2026-10-31y03y08-后端增量与验收)。豆瓣真实评价、第二独立评价源和完整最终验收仍未通过。
 
@@ -26,30 +37,42 @@ MVP模型配置写在项目根目录 `.env`：填写 `LLM_BASE_URL`、`LLM_MODEL
 - **[最新验收报告与三人进度对齐](docs/frontend/acceptance-20261023.md)**：直接阅读，无需下载 Actions 压缩包。列明版本、真实操作、CI 证据、未通过项和每位组员待交付事项。
 - [PR #4](https://github.com/yimou408-spec/getnewmovie/pull/4) · [云端预览运行](https://github.com/yimou408-spec/getnewmovie/actions/runs/39898294228) · [前端详细文档](docs/frontend/README.md)
 
-**当前尚未达到完整商业级验收。** 当前MVP进度以工作记录为准：模型推荐、一次条件补充及换组已有真实页面验证；完整六项交付验收尚未冻结。以下10月23日报告保留当时的工具/海报/联调问题与历史证据，不能代替本次版本验收。
+云模型使用团队已有 MVP 适配器，只有配置云服务后才发送观影描述并可能产生费用。默认本机模型不等同于 DeepSeek，也不保证理解复杂描述。Qwen 模型使用 Apache-2.0，llama.cpp 使用 MIT；安装器核对官方文件 SHA256，交付包附许可证。
 
-## 运行真实前端与 API
+```powershell
+.venv\Scripts\python.exe -m scripts.movie_demo --check
+```
 
-需要 Python 3.11+、Node.js 24，无需 TMDB 密钥。后端需能访问 Apple 美国区公开电影数据。
+以上命令仅显示脱敏状态，不请求资料源。已配置不等于联网通过；配置页显示当前进程实际模型调用成功的时间。可选 TMDB 与云模型不作为默认本机演示的验收前置条件。
 
-在仓库根目录构建并同源启动：
+## 当前 MVP 的边界
 
-~~~powershell
+- 支持零输入探索、自然语言条件、冲突确认、本次条件补充、换组、隐藏/撤销、片单和 2–3 部影片比较。心情是软偏好，类型、年代、片长和排除由代码严格筛选。
+- Apple 候选来自美国区当前分类榜单；搜索使用来源原文片名，不是全量片库。TMDB 热门查询单次最多核对 8 部；两种 ID 保留各自来源，不互相冒充。
+- 资料缓存约 30 分钟，显示来源、原始采集时间和事实/推断差别。Apple 未取得评分、影评和地区播放渠道时保持未知；商店链接不是直接播放。TMDB 评分保留量表与投票数。
+- 片单和临时隐藏在页面内存中，刷新清空；匿名条件上下文有时限。明确确认的偏好和已看使用匿名身份保存至本机 SQLite，支持关闭、改删与清空；不会自动同步其他设备。账号、正式公网部署和多源口碑仍待完成；豆瓣适配器与 TMDB 影评获取实现不等于真实多源评价验收通过。
+- 已从 GitHub 全新克隆，在无可用系统 Python/Node、无密钥、无项目缓存的隔离启动环境完成首次安装、真实页面和缓存重启验收；范围为 Windows x64 课堂展示，另一台实体电脑及其他操作系统未实测。详见[复现验收](docs/frontend/local-setup-acceptance-20261031.md)。
+
+## 开发与检查
+
+```powershell
 python -m pip install -r requirements-s0.txt
+python -m pytest -q
+python -m scripts.s0_check
+python -m scripts.s0_export_contracts --check
 cd web/app
 npm ci
 npm run build
-cd ../..
-python -m uvicorn scripts.movie_preview:app --host 127.0.0.1 --port 8000
-~~~
+npm test
+npm run format:check
+npx playwright test
+```
 
-打开 http://127.0.0.1:8000/，健康状态 http://127.0.0.1:8000/api/health。只发布前端构建目录与 API，支持子页面刷新；不发布仓库文件。这是复现说明，不表示当前用户电脑服务已恢复。
+分离开发：根目录运行 `python -m uvicorn scripts.movie_server:app --host 127.0.0.1 --port 8000`，另一终端在 `web/app` 运行 `npm run dev`，访问 http://127.0.0.1:5173/。Windows 浏览器验收优先使用本机 Chrome，可用 `MOVIE_DEMO_BASE_URL` 指定已启动的演示服务。
 
-开发模式在根目录启动 API：
+## 协作与历史资料
 
-~~~powershell
-python -m uvicorn scripts.movie_server:app --host 127.0.0.1 --port 8000
-~~~
+主仓库为 [yimou408-spec/getnewmovie](https://github.com/yimou408-spec/getnewmovie)，由 PionneerZ、yimou408-spec、2284266609-code 协作。当前缩减 MVP 范围以 [MVP工作记录](docs/MVP开发工作记录.md) 为准；[三人任务台账](docs/三人开发任务台账.md)、[10月23日验收](docs/frontend/acceptance-20261023.md)、[原限期计划](docs/限期开发实施计划_20261029.md) 保留历史事实，早期临时公网预览已过期。
 
 另一个终端：
 

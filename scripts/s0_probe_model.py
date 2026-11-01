@@ -11,14 +11,16 @@ import httpx
 from pydantic import ValidationError
 
 from scripts.s0_contracts import Constraints
+from scripts.movie_config import Settings, is_local_endpoint, valid_model_endpoint
 
 
 def probe_model(base_url, api_key, model, *, client=None):
     url = urlsplit(base_url)
-    if url.scheme != "https" or not url.hostname or url.username or url.password or url.query or url.fragment:
-        raise ValueError("LLM_BASE_URL must be an HTTPS endpoint without credentials/query/fragment")
+    if not valid_model_endpoint(base_url):
+        raise ValueError("LLM_BASE_URL must be HTTPS or an explicit loopback HTTP endpoint without credentials/query/fragment")
     if client is None:
-        with httpx.Client(timeout=20, follow_redirects=False) as owned_client:
+        with httpx.Client(timeout=30 if is_local_endpoint(base_url) else 20, follow_redirects=False, trust_env=False,
+                          proxy=None if is_local_endpoint(base_url) else os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")) as owned_client:
             return probe_model(base_url, api_key, model, client=owned_client)
     payload = {
         "model": model, "max_tokens": 150,
@@ -27,12 +29,18 @@ def probe_model(base_url, api_key, model, *, client=None):
             {"role": "user", "content": "想看100分钟以内的电影，不要恐怖片。"},
         ],
     }
+    if is_local_endpoint(base_url):
+        payload.update(temperature=0, response_format={"type": "json_schema", "json_schema": {
+            "name": "probe_constraints", "strict": True, "schema": {"type": "object", "additionalProperties": False,
+                "properties": {"max_runtime_minutes": {"type": "integer", "minimum": 1, "maximum": 600},
+                    "exclude_genres": {"type": "array", "items": {"type": "string"}}},
+                "required": ["max_runtime_minutes", "exclude_genres"]}}})
     started = time.perf_counter()
     result = {"mode": "live", "model": model, "endpoint_host": url.hostname, "requests_made": 1,
               "status": "not_checked", "quality_evaluation": "not_measured"}
     try:
         response = client.post(base_url.rstrip("/") + "/chat/completions", json=payload,
-                               headers={"Authorization": "Bearer " + api_key})
+                               headers={"Authorization": "Bearer " + api_key} if api_key else {})
         result["latency_ms"] = round((time.perf_counter() - started) * 1000)
         if response.status_code != 200:
             return {**result, "status": f"http_{response.status_code}"}
@@ -59,9 +67,10 @@ def main():
     if not args.live:
         print("NOT RUN: add --live to enable one model request.")
         return 2
-    values = [os.getenv(key, "").strip() for key in ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL")]
-    if not all(values):
-        print("NOT_CONFIGURED: set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL; no HTTP requests made.")
+    settings = Settings.load()
+    values = [settings.llm_base_url, settings.llm_api_key, settings.llm_model]
+    if settings.report().llm.state != "configured":
+        print("NOT_CONFIGURED: use the local model launcher or configure a remote model; no HTTP requests made.")
         return 2
     try:
         result = probe_model(*values)

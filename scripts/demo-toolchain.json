@@ -1,0 +1,26 @@
+{
+  "platform": "windows-x64",
+  "python": "3.13.9",
+  "tools": [
+    {
+      "name": "uv",
+      "version": "0.9.8",
+      "size": 20840146,
+      "url": "https://github.com/astral-sh/uv/releases/download/0.9.8/uv-x86_64-pc-windows-msvc.zip",
+      "sha256": "bb94629392b11d49f202e748d5842a0c89ebe570c152ad8ea1425ece01dc4222",
+      "archive": "uv-0.9.8.zip",
+      "folder": "uv-0.9.8",
+      "executable": "uv.exe"
+    },
+    {
+      "name": "Node.js",
+      "version": "24.11.1",
+      "size": 36343385,
+      "url": "https://nodejs.org/dist/v24.11.1/node-v24.11.1-win-x64.zip",
+      "sha256": "5355ae6d7c49eddcfde7d34ac3486820600a831bf81dc3bdca5c8db6a9bb0e76",
+      "archive": "node-v24.11.1-win-x64.zip",
+      "folder": "node",
+      "executable": "node-v24.11.1-win-x64/node.exe"
+    }
+  ]
+}

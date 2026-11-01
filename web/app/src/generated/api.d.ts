@@ -126,6 +126,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/configuration": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Configuration */
+    get: operations["configuration_configuration_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/recommendations": {
     parameters: {
       query?: never;
@@ -482,6 +499,23 @@ export interface components {
        */
       token_type: "Bearer";
     };
+    /** IntegrationState */
+    IntegrationState: {
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "not_configured" | "incomplete" | "invalid" | "configured";
+      /** Missing */
+      missing?: string[];
+      /**
+       * Live Verified
+       * @default false
+       */
+      live_verified: boolean;
+      /** Verified At */
+      verified_at?: string | null;
+    };
     /** Interpretation */
     Interpretation: {
       /**
@@ -714,6 +748,34 @@ export interface components {
       clarification_id?: string | null;
       /** Source Results */
       source_results?: components["schemas"]["SourceEvidenceResult"][] | null;
+    };
+    /** RuntimeConfiguration */
+    RuntimeConfiguration: {
+      /**
+       * Catalog Provider
+       * @enum {string}
+       */
+      catalog_provider: "apple" | "tmdb";
+      /**
+       * Intent Method
+       * @enum {string}
+       */
+      intent_method: "rules-v1" | "llm-v1";
+      llm: components["schemas"]["IntegrationState"];
+      tmdb: components["schemas"]["IntegrationState"];
+      /**
+       * Model Location
+       * @default rules
+       * @enum {string}
+       */
+      model_location: "local" | "remote" | "rules";
+      /** Model Name */
+      model_name?: string | null;
+      /**
+       * Catalog Fallback Active
+       * @default false
+       */
+      catalog_fallback_active: boolean;
     };
     /** SeenResponse */
     SeenResponse: {
@@ -1127,6 +1189,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HealthResponse"];
+        };
+      };
+    };
+  };
+  configuration_configuration_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RuntimeConfiguration"];
         };
       };
     };

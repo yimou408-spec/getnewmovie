@@ -30,6 +30,23 @@ class HealthResponse(StrictModel):
     capabilities: ServiceCapabilities | None = None
 
 
+class IntegrationState(StrictModel):
+    state: Literal["not_configured", "incomplete", "invalid", "configured"]
+    missing: list[str] = Field(default_factory=list)
+    live_verified: bool = False
+    verified_at: str | None = None
+
+
+class RuntimeConfiguration(StrictModel):
+    catalog_provider: Literal["apple", "tmdb"]
+    intent_method: Literal["rules-v1", "llm-v1"]
+    llm: IntegrationState
+    tmdb: IntegrationState
+    model_location: Literal["local", "remote", "rules"] = "rules"
+    model_name: str | None = None
+    catalog_fallback_active: bool = False
+
+
 class Constraints(StrictModel):
     max_runtime_minutes: int | None = Field(default=None, ge=1, le=600)
     exclude_movie_ids: list[str] = Field(default_factory=list, max_length=500)

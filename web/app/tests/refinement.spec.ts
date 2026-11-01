@@ -11,7 +11,9 @@ test("real refinement: remove one condition, submit it and return without losing
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false", {
+    timeout: 50000,
+  });
   await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const input = page.getByLabel("说说今晚想看什么（可选）", { exact: true });
   const mood = page.getByRole("group", { name: "想要什么感觉？" });

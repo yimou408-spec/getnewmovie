@@ -9,6 +9,27 @@ from scripts.movie_server import create_app
 from tests.test_movie_intent import CatalogDouble
 
 
+def test_same_origin_api_preserves_identity_memory_and_no_store_headers(tmp_path):
+    repo = Repository(tmp_path / "merged.sqlite3")
+    with TestClient(create_app(CatalogDouble(), repository=repo)) as client:
+        identity = client.post("/api/identities")
+        assert identity.status_code == 200
+        assert identity.headers["cache-control"] == "no-store"
+        headers = {"Authorization": "Bearer " + identity.json()["identity_token"]}
+        session = client.post("/api/sessions", headers=headers)
+        assert session.headers["cache-control"] == "no-store"
+        preferences = client.get("/api/me/preferences", headers=headers)
+        assert preferences.status_code == 200
+        assert preferences.headers["cache-control"] == "no-store"
+        seen = client.get("/api/me/seen", headers=headers)
+        assert seen.status_code == 200 and seen.json()["movie_ids"] == []
+        assert client.get("/api/health").json()["capabilities"]["long_term_memory"] is True
+        assert client.get("/api/configuration").status_code == 200
+        removed = client.delete("/api/me/data?confirmed=true", headers=headers)
+        assert removed.status_code == 200
+        assert client.get("/api/me/preferences", headers=headers).status_code == 401
+
+
 def test_migration_restart_isolation_and_expiring_sessions(tmp_path):
     path = tmp_path / "state.sqlite3"
     repo = Repository(path, clock=lambda: 100)

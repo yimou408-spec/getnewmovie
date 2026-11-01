@@ -31,8 +31,8 @@ const capabilities = [
   ],
   [
     "natural_language",
-    "自然语言规则解析",
-    "识别常见类型、心情、时长与排除；冲突和未识别条件需确认。不具备通用模型理解能力。",
+    "自然语言条件解析",
+    "可用本机 Qwen 或配置的云模型提取受限条件，也保留规则模式。冲突和未识别条件需确认，电影事实与排序仍由片库和规则提供。",
   ],
   [
     "model_understanding",
@@ -103,13 +103,17 @@ export function ServiceStatusView({ health }: { health: Health }) {
   );
 }
 
-export function ServiceStatus() {
-  const query = useQuery({
+export function useServiceHealth() {
+  return useQuery({
     queryKey: ["service-capabilities"],
     queryFn: async () => validateHealth(await api("/health")),
     staleTime: 30000,
     retry: false,
   });
+}
+
+export function ServiceStatus() {
+  const query = useServiceHealth();
   if (query.isPending) return <p role="status">正在读取服务声明…</p>;
   if (query.error)
     return (
