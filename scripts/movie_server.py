@@ -47,7 +47,7 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
     repository = repository or Repository((os.getenv("MOVIE_DB_PATH") or Path(__file__).resolve().parents[1] / "artifacts/state/movie.sqlite3") if production else ":memory:")
     if evidence_service is None:
         from app.services.evidence import configured_adapters
-        evidence_service = EvidenceService(repository, configured_adapters() if production else {})
+        evidence_service = EvidenceService(repository, configured_adapters(token=settings.tmdb_read_token) if production else {})
     sessions = IntentSessions(parser=intent_parser)
     agent_contexts = {}
     workflow = AgentWorkflow(catalog, model_factory) if model_factory else None

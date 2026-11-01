@@ -168,6 +168,14 @@ def test_only_explicitly_configured_token_enables_tmdb(monkeypatch):
     assert "tmdb" not in configured_adapters()
 
 
+def test_evidence_adapters_use_loaded_settings_token_without_mutating_environment(monkeypatch):
+    monkeypatch.setenv("TMDB_READ_TOKEN", "")
+    monkeypatch.setenv("MOVIE_TMDB_LIVE", "1")
+    adapters = configured_adapters(token="offline-loaded-token")
+    assert adapters["tmdb"].token == "offline-loaded-token"
+    assert "tmdb" not in configured_adapters()
+
+
 def test_disabled_adapter_reports_registered_mapping_without_network():
     repo = Repository(":memory:")
     repo.register_mapping("itunes:101", mapped_movie().external_ids[0])

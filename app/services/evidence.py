@@ -24,9 +24,9 @@ class DoubanSource:
             return DoubanAdapter(client, max_requests=2).fetch(movie_id, external_id)
 
 
-def configured_adapters():
+def configured_adapters(*, token=None):
     adapters = {"douban": DoubanSource()} if os.getenv("MOVIE_DOUBAN_LIVE") == "1" else {}
-    token = os.getenv("TMDB_READ_TOKEN", "").strip()
+    token = (os.getenv("TMDB_READ_TOKEN", "") if token is None else token).strip()
     if token and os.getenv("MOVIE_TMDB_LIVE", "1") == "1":
         from scripts.tmdb_adapter import TMDBSource
         adapters["tmdb"] = TMDBSource(token)
