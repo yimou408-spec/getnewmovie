@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EvidenceOverview, Ratings, TMDBAttribution } from "./evidence";
+import {
+  EvidenceOverview,
+  Ratings,
+  TMDBAttribution,
+  OpinionSynthesis,
+} from "./evidence";
 import { evidenceForMovie, snapshotForComparison } from "./evidence-model";
 import { validateResponse, type Recommendation } from "./domain";
 import fixture from "../../../contracts/examples/success.json";
@@ -9,6 +14,72 @@ import fixture from "../../../contracts/examples/success.json";
 // Contract fixtures are used only in offline tests, never in the running app.
 afterEach(cleanup);
 const response = () => structuredClone(fixture) as Recommendation;
+
+it("shows scoped opinion comparison with citations and inference labels", () => {
+  const data = response();
+  const candidate = data.candidates[0];
+  const evidence = ["a", "b"].map((id) => ({
+    ...data.evidence[0],
+    evidence_id: id,
+    movie_id: candidate.movie.movie_id,
+    source: `Offline ${id}`,
+    url: `https://example.com/${id}`,
+    kind: "review" as const,
+    granularity: "excerpt" as const,
+    spoiler_level: "safe" as const,
+    usage_basis: "synthetic" as const,
+    author: id,
+    independent_source_group: id,
+    claim: "氛围轻松。",
+  }));
+  candidate.opinion_summary = {
+    status: "compared",
+    synthetic: true,
+    independent_group_count: 2,
+    opinions: evidence.map((e) => ({
+      evidence_id: e.evidence_id,
+      aspect: "tone",
+      value: "light",
+      quote: "氛围轻松",
+    })),
+    comparisons: [
+      {
+        aspect: "tone",
+        kind: "agreement",
+        text: "本次材料均提到轻松氛围。",
+        evidence_ids: ["a", "b"],
+      },
+    ],
+    matches: [{ text: "符合本次放松需求。", evidence_ids: ["a"] }],
+    cautions: [],
+    limitations: ["不代表全网口碑。"],
+    extraction_method: "controlled_phrases",
+    model_status: "not_enabled",
+    followup_status: "not_needed",
+  };
+  const wire = { ...data, evidence: [...data.evidence, ...evidence] };
+  expect(() => validateResponse(wire)).not.toThrow();
+  const forged = structuredClone(wire);
+  forged.candidates[0].opinion_summary!.opinions![0].quote = "编造观点";
+  expect(() => validateResponse(forged)).toThrow();
+  const duplicate = structuredClone(wire);
+  duplicate.evidence.find(
+    (e) => e.evidence_id === "b",
+  )!.independent_source_group = "a";
+  expect(() => validateResponse(duplicate)).toThrow();
+  render(<OpinionSynthesis candidate={candidate} evidence={evidence} />);
+  expect(screen.getByRole("heading", { name: "材料观点对照" })).toBeVisible();
+  expect(screen.getByText(/离线合成材料/)).toBeVisible();
+  expect(screen.getByText("与你需求的关系（匹配推断）")).toBeVisible();
+  expect(screen.getAllByRole("link", { name: /Offline a/ })[0]).toHaveAttribute(
+    "href",
+    "https://example.com/a",
+  );
+  evidence[0].spoiler_level = "unknown" as "safe";
+  cleanup();
+  render(<OpinionSynthesis candidate={candidate} evidence={evidence} />);
+  expect(screen.queryByText("本次材料均提到轻松氛围。")).toBeNull();
+});
 
 describe("evidence identity and provenance", () => {
   it("shows TMDB attribution with an accessible logo and official source link", () => {

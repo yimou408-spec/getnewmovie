@@ -26,6 +26,7 @@ from scripts.movie_sources import CatalogRouter
 from app.services.storage import Repository, StoreError
 from app.services.memory import apply_memory, bounded_exclusions
 from app.services.evidence import EvidenceService
+from app.services.opinions import OpinionPipeline
 from app.services.request_limits import RequestLimits
 from app.services.budget import RequestBudget, catalog_lock, consume, current_budget
 from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
@@ -35,7 +36,7 @@ from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, Er
 
 
 def create_app(catalog=None, *, model_factory=None, repository=None, evidence_service=None, budget_factory=RequestBudget,
-               settings=None, frontend_dir=None, intent_parser=None, backup_catalog=None):
+               settings=None, frontend_dir=None, intent_parser=None, backup_catalog=None, opinion_factory=None):
     production = catalog is None
     settings = settings or Settings.load()
     catalog = catalog or (TMDBCatalog(settings.tmdb_read_token) if settings.provider == "tmdb" else AppleCatalog())
@@ -48,6 +49,9 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
     if evidence_service is None:
         from app.services.evidence import configured_adapters
         evidence_service = EvidenceService(repository, configured_adapters(token=settings.tmdb_read_token) if production else {})
+    if opinion_factory is None:
+        from scripts.opinion_model import configured_opinion_factory
+        opinion_factory = configured_opinion_factory(settings) if production else OpinionPipeline
     sessions = IntentSessions(parser=intent_parser)
     agent_contexts = {}
     workflow = AgentWorkflow(catalog, model_factory) if model_factory else None
@@ -345,8 +349,12 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
                 catalog_size=agent_result.catalog_size if agent_result is not None else len(films),
                 matched_count=agent_result.matched_count if agent_result is not None else len(eligible), interpretation=interpretation)
         source_results = []
+        opinion_pipeline = opinion_factory()
         for candidate in response.candidates:
             results = evidence_service.collect(candidate.movie)
+            summary, additions = opinion_pipeline.run(candidate.movie.movie_id, c, results)
+            results = [*results, *additions]
+            candidate.opinion_summary = summary
             source_results.extend(results)
             for result in results:
                 # Unverified use permissions never publish acquired review text.

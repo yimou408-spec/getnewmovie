@@ -36,6 +36,68 @@ export function validateResponse(raw: unknown): Recommendation {
   )
     throw new Error("服务返回的候选状态不完整。");
   for (const c of raw.candidates) {
+    const summary = c.opinion_summary;
+    if (summary) {
+      const supported = new Map(
+        (summary.opinions ?? []).map((p) => [
+          p.evidence_id,
+          evidence.get(p.evidence_id),
+        ]),
+      );
+      for (const p of summary.opinions ?? []) {
+        const e = supported.get(p.evidence_id);
+        if (
+          !e ||
+          e.movie_id !== c.movie.movie_id ||
+          e.kind !== "review" ||
+          e.spoiler_level !== "safe" ||
+          !e.author ||
+          (raw.source_results ?? []).some(
+            (r) =>
+              (r.evidence ?? []).some(
+                (item) => item.evidence_id === p.evidence_id,
+              ) &&
+              (r.status !== "ok" || r.cache_status === "stale"),
+          ) ||
+          !["licensed", "provider_terms", "synthetic"].includes(
+            e.usage_basis ?? "",
+          ) ||
+          !e.claim.includes(p.quote)
+        )
+          throw new Error("观点缺少同片安全原文支持。");
+      }
+      for (const p of [
+        ...(summary.comparisons ?? []),
+        ...(summary.matches ?? []),
+        ...(summary.cautions ?? []),
+      ])
+        if (p.evidence_ids.some((id) => !supported.get(id)))
+          throw new Error("观点对照缺少引用。");
+      for (const p of summary.comparisons ?? []) {
+        const groups = new Set(
+          p.evidence_ids
+            .map((id) => supported.get(id)?.independent_source_group)
+            .filter(Boolean),
+        );
+        if (
+          groups.size < 2 ||
+          p.evidence_ids.some(
+            (id) =>
+              !(summary.opinions ?? []).some(
+                (o) => o.evidence_id === id && o.aspect === p.aspect,
+              ),
+          )
+        )
+          throw new Error("观点对照需要相同主题的独立来源。");
+      }
+      if (
+        (summary.opinions ?? []).some(
+          (p) => evidence.get(p.evidence_id)?.usage_basis === "synthetic",
+        ) &&
+        !summary.synthetic
+      )
+        throw new Error("合成观点必须明确标记。");
+    }
     if (c.movie.ratings?.some((r) => r.value > r.scale))
       throw new Error("评分超出了来源量表。");
     for (const id of [

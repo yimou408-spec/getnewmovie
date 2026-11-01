@@ -303,12 +303,46 @@ class Availability(StrictModel):
     checked_at: str | None = None
 
 
+class OpinionSelection(StrictModel):
+    evidence_id: str = Field(min_length=1, max_length=200)
+    aspect: Literal["pace", "tone", "acting", "visuals"]
+    value: Literal["slow", "brisk", "light", "heavy", "strong", "weak"]
+    quote: str = Field(min_length=1, max_length=100)
+
+
+class OpinionComparison(StrictModel):
+    aspect: Literal["pace", "tone", "acting", "visuals"]
+    kind: Literal["agreement", "disagreement"]
+    text: str = Field(min_length=1, max_length=300)
+    evidence_ids: list[str] = Field(min_length=2, max_length=12)
+
+
+class OpinionMatch(StrictModel):
+    text: str = Field(min_length=1, max_length=300)
+    evidence_ids: list[str] = Field(min_length=1, max_length=12)
+
+
+class OpinionSummary(StrictModel):
+    status: Literal["insufficient", "single_group", "independence_unknown", "no_overlap", "compared"]
+    synthetic: bool
+    extraction_method: Literal["controlled_phrases", "model_selected"] = "controlled_phrases"
+    model_status: Literal["not_enabled", "ok", "invalid_output", "unavailable", "budget_exhausted"] = "not_enabled"
+    independent_group_count: int = Field(ge=0, le=6)
+    opinions: list[OpinionSelection] = Field(default_factory=list, max_length=24)
+    comparisons: list[OpinionComparison] = Field(default_factory=list, max_length=8)
+    matches: list[OpinionMatch] = Field(default_factory=list, max_length=4)
+    cautions: list[OpinionMatch] = Field(default_factory=list, max_length=4)
+    limitations: list[str] = Field(default_factory=list, max_length=8)
+    followup_status: Literal["not_needed", "not_configured", "completed", "failed", "budget_exhausted", "safety_review_needed", "source_unavailable"] = "not_needed"
+
+
 class Candidate(StrictModel):
     movie: Movie
     reason: Reason
     caveats: list[str] = Field(default_factory=list)
     uncertain_conditions: list[str] = Field(default_factory=list)
     availability: list[Availability] = Field(min_length=1)
+    opinion_summary: OpinionSummary | None = None
 
 
 class Question(StrictModel):
@@ -358,6 +392,11 @@ class RecommendationResponse(StrictModel):
         if len(evidence_map) != len(self.evidence):
             raise ValueError("duplicate evidence ID")
         for candidate in self.candidates:
+            if candidate.opinion_summary is not None:
+                from app.services.opinions import validate_synthesis
+                validate_synthesis(candidate.opinion_summary, candidate.movie.movie_id, self.evidence,
+                                   self.interpretation.effective_constraints if self.interpretation else Constraints(),
+                                   self.source_results)
             refs = candidate.reason.evidence_ids + [r.evidence_id for r in candidate.movie.ratings]
             for ref in refs:
                 if ref not in evidence_map or evidence_map[ref].movie_id != candidate.movie.movie_id:

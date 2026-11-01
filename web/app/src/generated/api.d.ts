@@ -248,6 +248,7 @@ export interface components {
       uncertain_conditions?: string[];
       /** Availability */
       availability: components["schemas"]["Availability"][];
+      opinion_summary?: components["schemas"]["OpinionSummary"] | null;
     };
     /** ClarificationAnswer */
     ClarificationAnswer: {
@@ -614,6 +615,104 @@ export interface components {
       movies: components["schemas"]["Movie"][];
       /** Requires Confirmation */
       requires_confirmation: boolean;
+    };
+    /** OpinionComparison */
+    OpinionComparison: {
+      /**
+       * Aspect
+       * @enum {string}
+       */
+      aspect: "pace" | "tone" | "acting" | "visuals";
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "agreement" | "disagreement";
+      /** Text */
+      text: string;
+      /** Evidence Ids */
+      evidence_ids: string[];
+    };
+    /** OpinionMatch */
+    OpinionMatch: {
+      /** Text */
+      text: string;
+      /** Evidence Ids */
+      evidence_ids: string[];
+    };
+    /** OpinionSelection */
+    OpinionSelection: {
+      /** Evidence Id */
+      evidence_id: string;
+      /**
+       * Aspect
+       * @enum {string}
+       */
+      aspect: "pace" | "tone" | "acting" | "visuals";
+      /**
+       * Value
+       * @enum {string}
+       */
+      value: "slow" | "brisk" | "light" | "heavy" | "strong" | "weak";
+      /** Quote */
+      quote: string;
+    };
+    /** OpinionSummary */
+    OpinionSummary: {
+      /**
+       * Status
+       * @enum {string}
+       */
+      status:
+        | "insufficient"
+        | "single_group"
+        | "independence_unknown"
+        | "no_overlap"
+        | "compared";
+      /** Synthetic */
+      synthetic: boolean;
+      /**
+       * Extraction Method
+       * @default controlled_phrases
+       * @enum {string}
+       */
+      extraction_method: "controlled_phrases" | "model_selected";
+      /**
+       * Model Status
+       * @default not_enabled
+       * @enum {string}
+       */
+      model_status:
+        | "not_enabled"
+        | "ok"
+        | "invalid_output"
+        | "unavailable"
+        | "budget_exhausted";
+      /** Independent Group Count */
+      independent_group_count: number;
+      /** Opinions */
+      opinions?: components["schemas"]["OpinionSelection"][];
+      /** Comparisons */
+      comparisons?: components["schemas"]["OpinionComparison"][];
+      /** Matches */
+      matches?: components["schemas"]["OpinionMatch"][];
+      /** Cautions */
+      cautions?: components["schemas"]["OpinionMatch"][];
+      /** Limitations */
+      limitations?: string[];
+      /**
+       * Followup Status
+       * @default not_needed
+       * @enum {string}
+       */
+      followup_status:
+        | "not_needed"
+        | "not_configured"
+        | "completed"
+        | "failed"
+        | "budget_exhausted"
+        | "safety_review_needed"
+        | "source_unavailable";
     };
     /** PreferencesResponse */
     PreferencesResponse: {
