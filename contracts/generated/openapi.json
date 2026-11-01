@@ -1229,7 +1229,8 @@
             "enum": [
               "title_year",
               "human_verified",
-              "provider_mapping"
+              "provider_mapping",
+              "multi_field_verified"
             ],
             "title": "Basis"
           }

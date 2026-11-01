@@ -21,7 +21,7 @@ def main():
     mapping.add_argument("--movie-id", required=True)
     mapping.add_argument("--provider", choices=["douban", "tmdb"], required=True)
     mapping.add_argument("--external-id", required=True)
-    mapping.add_argument("--basis", choices=["human_verified", "provider_mapping"], required=True)
+    mapping.add_argument("--basis", choices=["human_verified", "provider_mapping", "multi_field_verified"], required=True)
     mapping.add_argument("--confirmed", action="store_true")
     args = parser.parse_args()
     if args.action == "backup" and not args.database.is_file():

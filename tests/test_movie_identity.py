@@ -57,6 +57,14 @@ def test_external_link_must_match_its_provider_and_id():
                                   basis="title_year", url=url)
 
 
+def test_multifield_verification_records_agent_review_without_claiming_human_review():
+    link = ExternalMovieIdentity(provider="tmdb", external_id="123", status="confirmed",
+        basis="multi_field_verified", url="https://www.themoviedb.org/movie/123")
+    result = confirm_external_identity(Movie(movie_id="itunes:999", title="Offline movie"), link)
+    assert result.external_ids[0].basis == "multi_field_verified"
+    assert result.title == "Offline movie"
+
+
 def test_duplicate_external_provider_ids_are_rejected():
     link = dict(provider="douban", external_id="101", status="candidate", basis="title_year",
                 url="https://movie.douban.com/subject/101/")

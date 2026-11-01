@@ -29,6 +29,24 @@ const dateFormat = new Intl.DateTimeFormat("zh-CN", {
   timeZoneName: "short",
 });
 
+export function TMDBAttribution() {
+  return (
+    <section className="tmdb-attribution" aria-label="TMDB 数据署名">
+      <a
+        href="https://www.themoviedb.org/"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <img src="/tmdb-logo.svg" alt="TMDB" width="100" height="14" />
+      </a>
+      <p>
+        This product uses the TMDB API but is not endorsed or certified by TMDB.
+      </p>
+      <p>TMDB 补充影片资料；影片资料不等同于独立影评或观看渠道。</p>
+    </section>
+  );
+}
+
 function RetrievedAt({ value }: { value: string }) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? (
@@ -205,6 +223,7 @@ export function EvidenceOverview({
       {dataMode === "cached" && (
         <p className="notice">本次使用缓存证据，请核对每条采集时间。</p>
       )}
+      {entries.some((entry) => entry.source === "TMDB") && <TMDBAttribution />}
       <div className="evidence-coverage">
         <strong>
           {sites.length === 0

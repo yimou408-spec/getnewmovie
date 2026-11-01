@@ -1,7 +1,7 @@
 [
   {"sample_id":"M01","query":"重庆森林","year":1994,"expected_tmdb_id":null,"reference_status":"pending_review","focus":"中文别名"},
   {"sample_id":"M02","query":"花样年华","year":2000,"expected_tmdb_id":null,"reference_status":"pending_review","focus":"中文别名"},
-  {"sample_id":"M03","query":"千与千寻","year":2001,"expected_tmdb_id":null,"reference_status":"pending_review","focus":"动画"},
+  {"sample_id":"M03","query":"千与千寻","year":2001,"expected_tmdb_id":129,"reference_status":"human_verified","focus":"动画"},
   {"sample_id":"M04","query":"喜宴","year":1993,"expected_tmdb_id":null,"reference_status":"pending_review","focus":"中文题材标签"},
   {"sample_id":"M05","query":"喜宴","year":2025,"expected_tmdb_id":null,"reference_status":"pending_review","focus":"同名翻拍"},
   {"sample_id":"M06","query":"Little Women","year":1994,"expected_tmdb_id":null,"reference_status":"pending_review","focus":"同名旧版"},

@@ -138,3 +138,85 @@ python -m scripts.backend_admin map --movie-id itunes:实际主ID --provider dou
 下一次继续开发或最终交付前，先提醒用户在本机配置`LLM_BASE_URL`、`LLM_MODEL`、`LLM_API_KEY`（不发聊天），再明确运行`python -m scripts.mvp_probe_model --live --case E02 --max-requests 1`，以及同一版本的真实冲突确认、失败恢复、记忆开关/补充/换组与删除验收；记录实际响应模型及脱敏结果。TMDB另需进程变量`TMDB_READ_TOKEN`，豆瓣/第二源仍需真实可用通路。P/C独立评审与另一环境复现保留待办。
 
 交付代码`d2fe338`已推送，评审入口为[PR #7](https://github.com/yimou408-spec/getnewmovie/pull/7)，目标main，等待独立主审。云端[后端检查](https://github.com/yimou408-spec/getnewmovie/actions/runs/41189032534)与[前端检查](https://github.com/yimou408-spec/getnewmovie/actions/runs/41189032572)均在运行任何步骤前被GitHub拒绝启动；检查注释为“The job was not started because recent account payments have failed or your spending limit needs to be increased.”。账号Billing & plans恢复后再重跑，不能把这两条标作代码测试失败或CI通过。未修改账号付款/限额设置。
+
+## 2026-11-01：TMDB 单样本真实访问通过
+
+- 用户在自己的PowerShell窗口配置`TMDB_READ_TOKEN`并运行单样本探测；本次读取本地忽略报告`artifacts/s0/tmdb-report.json`核对，采集时间为北京时间2026-11-01 17:18。共2次真实请求、1部详情、0错误；《重庆森林》(1994)返回候选`tmdb:11104`、中文片名、102分钟时长、11个关键词及6个别名。
+- 结果仍为`candidate_unverified`，需独立核对影片身份；CN地区观看渠道未知，不能解释为没有观看渠道。未修改`data/s0/tmdb_samples.json`的`pending_review`，未登记确认映射，也未接入生产推荐或认定多源评价验收通过。
+- 接续检查：当前代理进程和Windows用户级环境变量均未取得非空`TMDB_READ_TOKEN`。因此未发起新的三样本请求；用户窗口中的配置不能由本次结果推断为其他进程可见。未读取或输出令牌内容。
+- 下一步：在用户已配置令牌的同一PowerShell运行`python -m scripts.s0_probe_tmdb --live --limit 3 --max-requests 6 --output artifacts/s0/tmdb-20261101-three-samples.json`，最多6次请求。三样本仅验证中文资料及字段可达性；身份核对、翻拍/同名消歧和生产接线另行验收。
+
+### 三样本探测结果（北京时间17:21）
+
+- 已读取用户运行的`artifacts/s0/tmdb-20261101-three-samples.json`：3条样本、5次真实请求、0错误，预算未耗尽；本次代理未额外联网请求。
+- 《重庆森林》(1994)候选`tmdb:11104`，102分钟、6个别名；《花样年华》(2000)候选`tmdb:843`，99分钟、15个别名。两者均取得中文详情，仍为待独立核验候选，不能以两条详情推断片库总体覆盖率。
+- 《千与千寻》(2001)检索返回`129`和`535075`两个候选。探测器按歧义规则停止获取其详情，没有自动选择首条，因此仅有2条详情、共5次请求；这是消歧保护生效，不是API认证或网络失败。尚未核查两个候选各自的内容及类型。
+- 3条观看渠道状态均为unknown，其中第三条未进行详情查询，不能当作三个已核验影片都没有CN渠道。下一步核对两个候选的原名、导演、年份和作品类型，并为最终映射留证据；三条样本继续保持`pending_review`。生产TMDB适配与第二独立评价源仍未完成。
+
+### 《千与千寻》身份人工确认（2026-11-01）
+
+- 核验者：用户（项目持有人），在本次会话中明确确认第一个候选为目标电影，第二个候选为拍摄《千与千寻》的纪录片。候选URL分别为`https://www.themoviedb.org/movie/129`与`https://www.themoviedb.org/movie/535075`。这是用户人工核验依据，代理未独立访问网页复核导演等字段。
+- 已将`data/s0/tmdb_samples.json`的M03设置为`expected_tmdb_id=129`、`reference_status=human_verified`；M01/M02及其他未核验样本继续保持`pending_review`。原探测报告保留不变，不将历史ambiguous结果改写成成功，也未创建与Apple主ID的生产映射。
+- 下一步先按已确认参考ID重跑三样本探测，获取M03详情并确认`matches_reference`。随后实现TMDB生产资料适配、受控身份映射与缓存/预算接线，再验收中文资料和来源显示；独立评价源及口碑综合另行完成，不能以本次人工确认代替。
+
+## 2026-11-01：TMDB 资料适配接入推荐
+
+- 用户已持久保存令牌，本轮从Windows用户环境安全传入子进程，未输出或写入仓库。启动服务使用进程变量`TMDB_READ_TOKEN`；`MOVIE_TMDB_LIVE=0`可禁用，默认有令牌即启用。这两个变量不自动读取`.env`，已运行的服务需重启。
+- 新增`scripts/tmdb_adapter.py`，只对确认的数字ID请求`/3/movie/{id}`，最多一次HTTP，无重试/跳转；只取中文片名、原名、年份、时长和最多5个别名作为metadata证据，不取简介、影评、评分、海报或观看渠道。来源URL、采集时间、内容ID和provider_terms依据随证据保留；按[TMDB FAQ](https://developer.themoviedb.org/docs/faq)用于有署名的非商业原型，不声明商业授权。
+- `EvidenceService`按已有确认映射接入TMDB，复用30分钟持久缓存、fresh/stale状态及全请求预算/时限。将已确认链接附加到请求内候选，保留Apple主ID、原片名、时长、排序和硬筛选；不修改共享目录。没有映射不搜索，候选映射不请求，禁用或缺令牌会显示未配置。
+- 当前未创建真实Apple↔TMDB生产映射。《千与千寻》的人工确认仅核验TMDB查询种子；本轮Apple US直接搜索未取得候选，首次通过旧搜索入口触发榜单回退后被3次预算阻断，因此没有据此创建映射。后续必须核对真实Apple ID、导演、年份及作品类型后登记，不以片名/年份直接自动确认。
+- 复现配置：启动后端前在进程设置令牌，构建/启动沿用README。独立核验跨源身份后使用现有命令`python -m scripts.backend_admin map --movie-id itunes:实际核验主ID --provider tmdb --external-id 实际核验TMDB_ID --basis human_verified --confirmed`。样本的`expected_tmdb_id`不会自动导入数据库。
+- 已核对[官方署名要求](https://www.themoviedb.org/about/logos-attribution)，保存其官方原始SVG为`web/app/public/tmdb-logo.svg`，关于页和取得TMDB资料的来源面板显示标识及“This product uses the TMDB API but is not endorsed or certified by TMDB.”。未改变接口类型；现有JSON Schema/OpenAPI/TS生成链继续复用。
+
+### 真实结果与数据质量
+
+- 按用户确认参考ID重新运行三样本探测，报告`artifacts/s0/tmdb-20261101-confirmed-three.json`：6次请求、3条详情、0错误、0歧义；M03为matches_reference且无需再次人工核验，M01/M02仍待核验。探测器只验证API字段可达，不代表资料可直接发布。
+- 该报告中M03的中文title实际包含广告网址；本轮另取TMDB英文资料核对到原名及导演Hayao Miyazaki，但没有修改上游内容，也未把污染中文片名替换为已验证资料。适配器对名称字段进行NFKC标准化并拒绝明显网址、标记、控制字符及过长内容；不保证识别所有上游错误。必需片名异常时返回parse_error且不发布/缓存正文，异常可选别名忽略。
+- 新适配器真实复验`artifacts/s0/tmdb-20261101-adapter-smoke.json`：共3次HTTP；重庆森林、花样年华各取得1条资料，千与千寻的污染片名被拒绝（parse_error、0证据）。报告仅存状态、计数及固定警告，不复制污染正文。无模型调用、无豆瓣调用、无个人数据库写入。
+- 剩余：真实Apple跨源映射登记与真实推荐联合验收、污染字段上游恢复后的复验、第二独立评价源与口碑综合、M11真实模型验收、M12独立环境/最终签收。三条CN渠道仍未知。
+
+### 本轮工程验收
+
+- TDD：新增后端测试先因`scripts.tmdb_adapter`缺失收集失败；页面署名测试先因组件未实现失败，随后实现通过。新增20条后端用例覆盖同片绑定、候选/缺映射不请求、HTTP错误/超时、广告污染、别名边界、缓存过期、禁用与共享目录不被修改；全量`python -m scripts.s0_check`最终186项通过。
+- 前端Vitest39项通过，`types:check`生成一致性、生产构建及`format:check`通过；契约类型无变化，未手改生成文件。
+- 新增`tests/tmdb.spec.ts`明确使用离线合成资料；Chrome桌面/手机、明/暗四组合4/4通过，Axe检查和横向无溢出通过，约2.9分钟。测试仅验证本轮资料面板、署名、图标加载及关于页，不替代真实多源或模型验收，也未重跑历史全量228项。
+- 已查看桌面浅色及手机深色截图，文字与标识可读；截图在本地忽略目录`artifacts/tmdb-ui/`，测试服务独立绑定8011、模型/豆瓣禁用，未占用原预览端口。无新依赖，代码尚未提交/推送。
+
+## 2026-11-01：两组真实映射登记与推荐联合验收
+
+用户明确要求继续核验并登记映射及真实联调。本节更新上节“尚未创建真实映射”的阶段快照，不代签用户人工核验或其他成员评审。
+
+### 映射依据（代理多字段核验）
+
+| Apple主ID/来源 | TMDB ID/来源 | 核验结果 |
+|---|---|---|
+| [1886817811](https://itunes.apple.com/us/movie/the-legend-of-hei-ii/id1886817811) · The Legend of Hei II | [1144107](https://www.themoviedb.org/movie/1144107) · 罗小黑战记2 / The Legend of Hei 2 | 2025年、动画、Apple导演MTJJ & Jie GU与TMDB的MTJJ/Gu Jie对应；英文资料119分钟与Apple119分钟一致，随后中文资料120分钟。英文别名包含The Legend of Hei II；确认对应同一影片，保留两源时长差异。 |
+| [1806410314](https://itunes.apple.com/us/movie/vampire-hunter-d-dubbed/id1806410314) · Vampire Hunter D (Dubbed) | [9463](https://www.themoviedb.org/movie/9463) · 吸血鬼猎人D | 1985年、动画、导演Toyoo Ashida完全一致；英文标题对应，Apple81分钟与TMDB英文80/中文82分钟接近。Apple是配音发行条目，TMDB为作品级ID，未宣称音轨/剪辑版完全相同；硬过滤仍采用Apple81分钟。 |
+
+- 暂缓`itunes:1583335569`↔`tmdb:212162`（魔法少女小圆 叛逆的物语）：片名、2013年和117分钟一致，但Apple导演Akiyuki Shimbou与TMDB Director记录Yukihiro Miyamoto不同。尚未独立核对职务差异，不登记，不因单个搜索结果直接确认。
+- 原始精选元数据与核验决定保留于本地忽略目录`artifacts/tmdb-mapping/apple-candidates.json`、`tmdb-candidates.json`、`verified-mappings.json`；核验者为Codex代理，非人工签收。Apple发现3次HTTP，TMDB候选检索/英文详情6次、中文适配复查2次，无自动重试。
+- 为准确记录上述依据，给`ExternalMovieIdentity.basis`追加`multi_field_verified`，与`human_verified`、`provider_mapping`区分；不是开放客户端自助确认接口。`backend_admin map --basis`同步支持该值，Pydantic重新导出OpenAPI/响应Schema及前端TS类型。严格旧客户端须同步新枚举后使用。
+- 登记前创建本机数据库备份`artifacts/backups/pre-tmdb-map-20261101-180134.sqlite3`，随后向默认`artifacts/state/movie.sqlite3`登记上述两组映射，完整性检查ok、schema v3；未修改个人偏好/已看记录或覆盖已有映射。
+
+已核对上述证据后，其他环境可使用：
+
+```powershell
+python -m scripts.backend_admin map --movie-id itunes:1886817811 --provider tmdb --external-id 1144107 --basis multi_field_verified --confirmed
+python -m scripts.backend_admin map --movie-id itunes:1806410314 --provider tmdb --external-id 9463 --basis multi_field_verified --confirmed
+python -m scripts.tmdb_acceptance --live --movie-id itunes:1886817811 --movie-id itunes:1806410314
+```
+
+### 真实推荐与页面结果
+
+- 新增`scripts/tmdb_acceptance.py`：必须`--live`、非空进程令牌及1–3个已确认映射Apple ID才请求；以真实Apple目录/仓储/TMDB适配执行两次watchlist推荐。无模型、无豆瓣、无身份创建或个人记忆写入；只更新资料缓存。报告在Git忽略路径，默认`artifacts/tmdb-mapping/recommendation-smoke.json`。
+- 本次两源真实API联合验收8项全部通过：两次HTTP200、确认映射候选、fresh缓存、同片metadata证据、无评分/影评、Apple资料稳定、第二次零HTTP、未使用记忆。第一次共4次上游请求（2次Apple lookup、2次TMDB详情），第二次0次。这个结果验证上述两组，不证明全片库覆盖或推荐质量。
+- 本机同源预览独立启动于`http://127.0.0.1:8012/`，使用已登记数据库及TMDB令牌，禁用模型和豆瓣。Chrome桌面浅色/手机深色2/2真实页面通过：点选动画与榜单顺序、确认The Legend of Hei II候选、打开来源面板、核对中文资料与两源链接；Axe及无横向溢出通过。截图[桌面浅色](../frontend/screenshots/tmdb-20261101/desktop-light-live.png)、[手机深色](../frontend/screenshots/tmdb-20261101/mobile-dark-live.png)保留真实metadata，无令牌或个人材料；本机临时Playwright配置/脚本在`artifacts/tmdb-mapping/`。
+- TDD：先以失败测试复现basis枚举缺失和验收模块缺失，再实现；最终`s0_check`189项通过，前端39项、生产构建及格式检查通过。生成文件由工具重建，不手改Schema/TS；本轮未重复历史全量浏览器228项。未提交/推送。
+- 后续仍缺：更多映射与批量消歧、千与千寻污染字段复验、独立评价源/口碑综合、真实模型M11、独立环境M12及签收。上述两源仅为影片资料，不能标成“真实多源评价已完成”。
+
+### 联调验收脚本异常补测
+
+- 用户确认“不支持该模型”的报错来自当前对话界面并要求继续测试；本次仅检查电影项目配置完整性（无模型配置），未发模型请求、未修改对话服务或模型设置。
+- 按TDD追加7项用例：无令牌/无映射数据库/无已确认映射时零网络，HTTP失败、非法JSON、缺失响应字段、空证据、错片、错误TMDB内容ID不通过。复现验收器直接抛JSON/字段异常及内容ID不一致误判通过后修复：先按RecommendationResponse校验响应，额外绑定source_content_id与已确认外部ID及来源URL；异常标失败，不写原始错误正文。合计9项验收脚本测试通过。
+- 最终`s0_check`196项通过，契约检查通过；本次仅后端验收器改动，无前端变更，沿用上一节39项单测及真实页面证据。
+- 修复后真实复验报告`artifacts/tmdb-mapping/recommendation-smoke-negative-fix.json`，新增响应契约检查后9项全部通过；两次请求上游计数为2/0（两部Apple lookup；TMDB资料命中先前缓存），零模型/豆瓣请求。保留前次4/0冷TMDB缓存结果，不用本次缓存复验冒充新采集。

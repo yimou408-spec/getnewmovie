@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { EvidenceOverview, Ratings } from "./evidence";
+import { EvidenceOverview, Ratings, TMDBAttribution } from "./evidence";
 import { evidenceForMovie, snapshotForComparison } from "./evidence-model";
 import { validateResponse, type Recommendation } from "./domain";
 import fixture from "../../../contracts/examples/success.json";
@@ -10,6 +10,19 @@ afterEach(cleanup);
 const response = () => structuredClone(fixture) as Recommendation;
 
 describe("evidence identity and provenance", () => {
+  it("shows TMDB attribution with an accessible logo and official source link", () => {
+    render(<TMDBAttribution />);
+    expect(screen.getByAltText("TMDB")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "TMDB" })).toHaveAttribute(
+      "href",
+      "https://www.themoviedb.org/",
+    );
+    expect(
+      screen.getByText(
+        "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+      ),
+    ).toBeInTheDocument();
+  });
   it("rejects duplicate IDs and rating references to another film or source", () => {
     const duplicate = response();
     duplicate.evidence.push(duplicate.evidence[0]);

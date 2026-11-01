@@ -185,6 +185,18 @@ td .evidence-panel {
   margin: 0;
   border: 0;
 }
+.tmdb-attribution {
+  margin-block: 16px;
+  color: var(--text);
+}
+.tmdb-attribution img {
+  display: block;
+  width: 100px;
+  height: auto;
+}
+.tmdb-attribution p {
+  overflow-wrap: anywhere;
+}
 @media (max-width: 600px) {
   .evidence-drawer header {
     padding: 18px 20px;

@@ -4,6 +4,7 @@ import schema from "../../../contracts/generated/health-response.schema.json";
 import { api } from "./domain";
 import type { components } from "./generated/api";
 import { ErrorNotice } from "./request-feedback";
+import { TMDBAttribution } from "./evidence";
 
 export type Health = components["schemas"]["HealthResponse"];
 const valid = new Ajv({ strict: false }).compile<Health>(schema);
@@ -97,6 +98,7 @@ export function ServiceStatusView({ health }: { health: Health }) {
           </tbody>
         </table>
       </div>
+      <TMDBAttribution />
     </section>
   );
 }

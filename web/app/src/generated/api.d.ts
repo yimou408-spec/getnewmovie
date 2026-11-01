@@ -413,7 +413,11 @@ export interface components {
        * Basis
        * @enum {string}
        */
-      basis: "title_year" | "human_verified" | "provider_mapping";
+      basis:
+        | "title_year"
+        | "human_verified"
+        | "provider_mapping"
+        | "multi_field_verified";
     };
     /** FeedbackRequest */
     FeedbackRequest: {

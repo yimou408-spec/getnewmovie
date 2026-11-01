@@ -25,7 +25,12 @@ class DoubanSource:
 
 
 def configured_adapters():
-    return {"douban": DoubanSource()} if os.getenv("MOVIE_DOUBAN_LIVE") == "1" else {}
+    adapters = {"douban": DoubanSource()} if os.getenv("MOVIE_DOUBAN_LIVE") == "1" else {}
+    token = os.getenv("TMDB_READ_TOKEN", "").strip()
+    if token and os.getenv("MOVIE_TMDB_LIVE", "1") == "1":
+        from scripts.tmdb_adapter import TMDBSource
+        adapters["tmdb"] = TMDBSource(token)
+    return adapters
 
 
 class EvidenceService:
@@ -35,12 +40,18 @@ class EvidenceService:
 
     def collect(self, movie):
         from scripts.movie_identity import confirm_external_identity
+        target = movie
         for identity in self.repository.mappings(movie.movie_id):
             movie = confirm_external_identity(movie, identity)
+        # Caller owns a request-local Movie; expose confirmed links without
+        # replacing Apple title/runtime or modifying the shared catalog.
+        target.external_ids = movie.model_copy(deep=True).external_ids
         results = []
-        for provider in sorted({"douban", *self.adapters}):
+        providers = {"douban", *self.adapters, *(link.provider for link in movie.external_ids or []
+                                                if link.provider in {"douban", "tmdb"})}
+        for provider in sorted(providers):
             adapter = self.adapters.get(provider)
-            source = getattr(adapter, "source", "Douban" if provider == "douban" else provider)
+            source = getattr(adapter, "source", {"douban": "Douban", "tmdb": "TMDB"}.get(provider, provider))
             link = next((item for item in movie.external_ids or [] if item.provider == provider), None)
             if adapter is None or link is None:
                 results.append(SourceEvidenceResult(movie_id=movie.movie_id, source=source, status="not_configured",

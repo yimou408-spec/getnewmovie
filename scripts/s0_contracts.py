@@ -179,7 +179,7 @@ class ExternalMovieIdentity(StrictModel):
     external_id: str = Field(pattern=r"^[1-9][0-9]*$")
     status: Literal["candidate", "confirmed"]
     url: HttpUrl
-    basis: Literal["title_year", "human_verified", "provider_mapping"]
+    basis: Literal["title_year", "human_verified", "provider_mapping", "multi_field_verified"]
 
     @model_validator(mode="after")
     def check_confirmation(self):
