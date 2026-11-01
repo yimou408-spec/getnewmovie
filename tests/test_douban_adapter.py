@@ -146,3 +146,49 @@ def test_timeout_on_subject_and_comments_is_included_in_report():
     report = run_probe(httpx.Client(transport=httpx.MockTransport(handle)))
     assert report["summary"]["timeout_count"] == 2
     assert report["requests_made"] == 5
+
+
+def test_targeted_subject_probe_stops_after_blocked_first_pair_and_preserves_identity_uncertainty():
+    from scripts.douban_probe import run_subject_probe
+    calls = []
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(302, headers={'location': 'https://sec.douban.com/c?token=SECRET'})
+    report = run_subject_probe(httpx.Client(transport=httpx.MockTransport(handle)), '1296339')
+    assert len(calls) == report['requests_made'] == 2
+    assert len(report['results']) == 1 and report['sample_count'] == 1
+    assert report['results'][0]['evaluation_status'] == 'access_limited'
+    assert report['identity_status'] == 'pending_review'
+    assert not report['two_round_acquisition_passed'] and not report['multi_source_acceptance_passed']
+    assert 'SECRET' not in str(report)
+
+
+def test_targeted_subject_probe_success_requires_both_endpoints_and_two_rounds():
+    from scripts.douban_probe import run_subject_probe
+    subject = '''<script type="application/ld+json">{"@type":"Movie",
+      "url":"https://movie.douban.com/subject/101/","aggregateRating":
+      {"ratingValue":"8.2","bestRating":"10","ratingCount":"12"}}</script>'''
+    comments = '''<div class="comment-item" data-cid="901"><div class="comment">
+      <span class="comment-info"><a href="https://www.douban.com/people/test/">Test Author</a></span>
+      <span class="short">Invented comment; never print or store this text.</span></div></div>'''
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200,
+        text=subject if r.url.path == '/subject/101/' else comments)))
+    report = run_subject_probe(client, '101')
+    assert report['two_round_acquisition_passed'] and report['requests_made'] == 4
+    assert len(report['results']) == 2 and report['identity_status'] == 'pending_review'
+    assert all(r['score_count'] == r['review_excerpt_count'] == 1 for r in report['results'])
+    assert 'Invented comment' not in str(report)
+    limited = run_subject_probe(client, '101', max_requests=2)
+    assert not limited['two_round_acquisition_passed'] and len(limited['results']) == 1
+    partial = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200,
+        text=subject if r.url.path == '/subject/101/' else '<html></html>')))
+    failed = run_subject_probe(partial, '101')
+    assert not failed['two_round_acquisition_passed'] and failed['requests_made'] == 2
+
+
+def test_targeted_subject_probe_cli_rejects_invalid_id_before_network(monkeypatch):
+    from scripts.douban_probe import main
+    monkeypatch.setenv('DOUBAN_PROBE_NETWORK', 'direct')
+    monkeypatch.setattr('sys.argv', ['douban_probe', '--live', '--subject-id', '101/invalid'])
+    with pytest.raises(SystemExit):
+        main()

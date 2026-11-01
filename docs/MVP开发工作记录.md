@@ -415,3 +415,9 @@ Get-Content -Raw -Encoding UTF8 'artifacts/mvp/model-E02-report.json'
 - 真实TMDB目录＋审核后推荐API两次均HTTP504/UPSTREAM_TIMEOUT，报告 `artifacts/opinions/live-api-report.json`，明确失败；先前额外Apple lookup未返回对应条目，也未登记映射。真实采集及本地回放成功不能替代真实推荐端到端通过。离线生产接线测试确认配置登记路径后API返回同片审核摘录且独立性未知，不将该替身算真实端到端。
 - 新增可复用 `scripts/review_acceptance.py`：必须 `--live`、有效令牌、1–6个明确TMDB ID，默认逐片一次请求；保留失败分母和脱敏计数，不写影评正文或模型输出，不触碰生产数据库/记忆。无论单平台采集是否成功，`multi_source_acceptance_passed` 固定false。下一步仍需来源方允许且实际可用的豆瓣自动通路和独立第二平台，并复验真实推荐超时；人工签收、10片覆盖、C08对照及M12未被代替。
 - 最终新增命令真实复测1次HTTP，TMDB155本次取得0条，报告 `artifacts/opinions/review-acceptance-final.json`，失败保留；不覆盖此前首轮成功采集。全部本轮探测合计TMDB影评7次HTTP，额外真实目录请求计数未知（两次API超时），无自动重试。最终 `s0_check` **320 passed**、契约导出一致、diff检查通过；新增18项审核、4项探测和1项短语回归，先失败再实现。本轮无前端或公共契约改动，未重跑前端/浏览器，不沿用旧结果冒称本轮真实多源已通过。
+
+## 2026-11-01 22:45 北京时间 · AntSpider参考与单影片豆瓣通路复验
+
+- 用户授权执行AntSpider参考方案；未运行其批量采集或安装旧依赖。新增单ID探测开关与3项离线回归，覆盖受限后停止、两页两轮成功条件、部分成功不通过、无正文报告及非法ID；先缺实现失败，再补实现。
+- 《Before Sunrise》(1995)候选豆瓣1296339保持pending_review；独立参考Wikidata本次403，未确认跨源映射。豆瓣详情/短评各1次HTTP，均302安全验证，评分0、短评0，停止第二轮。真实解析及持续可用性未通过，按既定顺序暂不补导演/IMDb解析。结果、限制和复现见[单ID通路记录](backend/y02-identities-evidence.md#2026-11-01-2245-北京时间antspider参考审阅后的单id通路验证)。未触碰生产数据库或用户提供的AntSpider文件。
+- 最终 `s0_check` **323 passed**、契约检查和diff检查通过。本轮只改探测器、离线测试及记录，无产品前端/公共契约变化；未重跑浏览器，未调用模型。工程通过不改变豆瓣自动通路受限和真实多源未通过状态。
