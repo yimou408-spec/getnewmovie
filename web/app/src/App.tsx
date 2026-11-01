@@ -1786,6 +1786,8 @@ export default function App() {
                         </div>
                       )}
                       {resultRequest?.mode === "discover" &&
+                        service.data?.capabilities?.model_understanding ===
+                          true &&
                         (result.interpretation?.method === "llm-v1" ||
                           resultRequest.input_source === "natural_language") &&
                         result.status !== "needs_clarification" && (
@@ -1869,6 +1871,8 @@ export default function App() {
                             onClick={() => {
                               if (
                                 resultRequest?.mode === "discover" &&
+                                service.data?.capabilities
+                                  ?.model_understanding === true &&
                                 result.interpretation &&
                                 (result.interpretation?.method === "llm-v1" ||
                                   resultRequest.input_source ===

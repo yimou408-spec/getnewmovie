@@ -70,10 +70,10 @@
 
 ## 本轮完整分支复现与签收
 
-本轮交接分支为 `feat/backend-persistence-evidence`，包含主分支一键启动及本分支持久化、TMDB 资料/可选影评和模型冲突修复。请从 GitHub 下载这个分支的完整源码；若使用 Git：
+本轮完整代码已合入 `main`，包含一键启动、持久化、TMDB 资料/可选影评和模型冲突修复；`feat/backend-persistence-evidence` 保留整合开发记录。队友请从 GitHub 选择 `main` 后使用 Code → Download ZIP，完整解压再运行；也可使用 Git：
 
 ```powershell
-git clone --branch feat/backend-persistence-evidence https://github.com/yimou408-spec/getnewmovie.git
+git clone --branch main https://github.com/yimou408-spec/getnewmovie.git
 cd getnewmovie
 git rev-parse HEAD
 .\start-demo.cmd
@@ -82,3 +82,5 @@ git rev-parse HEAD
 记录完整提交哈希；浏览器打开后检查零输入推荐、文字与点选冲突两种选择、补充时长、换组、详情来源、片单/比较、临时隐藏撤销，以及匿名偏好/已看在刷新与服务重启后保留、关闭记忆和删除数据。需要测试真实云模型/TMDB时，由测试者在其本机配置凭据；不要复制或提交他人密钥。默认本机模型通过不等同于云模型或真实豆瓣通过。
 
 请将操作系统、提交哈希、实际模型、启动结果、上述检查结果和失败截图/脱敏错误登记回现有工作记录，并由实际操作成员签收。首次下载约1.1 GB模型及工具，建议预留6 GB空间；另一台电脑签收和真实多源评价状态分别记录。
+
+若已有旧副本且工作区没有未保存改动，可运行 `git switch main`、`git pull --ff-only origin main` 再启动；有本地改动时保留原副本，另建目录下载，避免覆盖。ZIP 下载者保留本次下载链接和 GitHub 页面显示的提交哈希。
