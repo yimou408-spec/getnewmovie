@@ -72,6 +72,8 @@
 
 本轮完整代码已合入 `main`，包含一键启动、持久化、TMDB 资料/可选影评和模型冲突修复；`feat/backend-persistence-evidence` 保留整合开发记录。队友请从 GitHub 选择 `main` 后使用 Code → Download ZIP，完整解压再运行；也可使用 Git：
 
+已完成云端验证的业务版本为 `7da4adf9af4e298a8d1cfef07bfd8650eb772393`：[固定版本ZIP](https://github.com/yimou408-spec/getnewmovie/archive/7da4adf9af4e298a8d1cfef07bfd8650eb772393.zip)。该版本后端离线检查、前端类型/单测/构建/格式及244项浏览器验收通过；8项需专用模型/故障环境的浏览器检查未在CI运行。后续仅补文档时可以使用最新 `main`，请保留实际版本记录。
+
 ```powershell
 git clone --branch main https://github.com/yimou408-spec/getnewmovie.git
 cd getnewmovie
