@@ -1,0 +1,1180 @@
+{
+  "schema_version": "1.0.0",
+  "title": "C08 IMDb single-platform review value and safety comparison",
+  "prepared_on": "2026-11-02",
+  "timezone": "Asia/Shanghai",
+  "provenance": "evaluation_protocol_only_no_acquired_reviews_or_results",
+  "status": "not_run_requires_real_imdb",
+  "scope": {
+    "catalog_providers": [
+      "apple",
+      "tmdb"
+    ],
+    "review_provider": "imdb",
+    "comparison_scope": "single_platform",
+    "cross_platform_consensus_tested": false,
+    "licensed_individual_review_access_verified": false,
+    "production_imdb_adapter_enabled": false,
+    "task_count": 30,
+    "film_slot_count": 10,
+    "fixed_samples_required": true,
+    "minimum_usable_deduplicated_reviews_per_film": 2,
+    "include_recent_90_day_film": true,
+    "failures_remain_in_denominator": true
+  },
+  "prerequisites": [
+    "I01: verify a product actually supplies licensed individual IMDb user reviews; ratings and AI summaries are not substitutes.",
+    "I02/I03: independently confirm catalog-to-IMDb identities and implement the bounded configured source adapter.",
+    "Freeze 10 films and all acceptance inputs before live execution; retain unavailable/failed films rather than replacing them after seeing results.",
+    "Acquire permitted review text and record actual retrieval/update times, review IDs, authors, original URLs, usage basis, freshness and provenance.",
+    "Human reviewers establish quote-support and spoiler gold decisions from actual permitted excerpts; no fabricated reference answers."
+  ],
+  "freeze_manifest": {
+    "status": "pending",
+    "application_sha": null,
+    "protocol_sha256": null,
+    "sample_manifest_sha256": null,
+    "evidence_manifest_sha256": null,
+    "gold_manifest_sha256": null,
+    "run_date": null,
+    "model_name": null,
+    "model_prompt_version": null,
+    "planned_trial_participants": null,
+    "fields_to_freeze": [
+      "film_slot_to_confirmed_ids",
+      "film_release_dates_and_reference_day",
+      "candidate_set_and_order",
+      "requests_and_constraints",
+      "cleared_excerpt_set_and_digest",
+      "usage_basis_and_storage_display_model_permissions",
+      "human_reference_answers",
+      "variant_builds_and_blinding_schedule",
+      "reviewers_and_trial_sample_size",
+      "rating_scale_and_decision_rules",
+      "budgets"
+    ]
+  },
+  "variants": {
+    "A": {
+      "description": "Metadata and existing template reasons only.",
+      "review_evidence_included": false
+    },
+    "B": {
+      "description": "Same metadata, candidates and order, enriched only with licensed, cleared IMDb excerpts and scoped deterministic opinion output.",
+      "review_evidence_included": true
+    },
+    "controls": [
+      "Use identical film slots, metadata snapshot, queries, constraints, candidate IDs and ranking for both versions.",
+      "Do not let review availability alter candidate selection or baseline facts for this value comparison.",
+      "Use neutral display labels X/Y; keep the hidden A/B mapping outside participant-facing material.",
+      "Counterbalance first-view order across tasks and reviewers, and freeze the schedule before scores are collected.",
+      "For controlled failure tasks, apply the labelled fault to B's review evidence only; do not report it as a real provider failure.",
+      "A difference in acquisition, candidates, ranking or metadata must be reported as a protocol deviation, not attributed to review quality."
+    ]
+  },
+  "film_slots": [
+    {
+      "film_slot": "F01",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F02",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F03",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F04",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F05",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F06",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F07",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F08",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F09",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": false,
+      "selection_note": "Freeze a confirmed film before collecting results.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    },
+    {
+      "film_slot": "F10",
+      "identity_status": "pending_independent_verification",
+      "catalog_movie_id": null,
+      "imdb_title_id": null,
+      "release_date": null,
+      "original_title": null,
+      "require_release_within_90_days": true,
+      "selection_note": "Use release date relative to frozen run day; not acquisition date.",
+      "verified_by": null,
+      "identity_basis": null,
+      "usable_review_target": 2,
+      "actual_usable_reviews": null,
+      "coverage_status": "not_run"
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "C08-01",
+      "film_slot": "F01",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的节奏、氛围说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "pace",
+        "tone"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-02",
+      "film_slot": "F01",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "pace"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-03",
+      "film_slot": "F01",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "pace",
+        "tone"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "single_usable_review",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "Only one review remains after clearance and deduplication; no agreement or disagreement may be invented.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-04",
+      "film_slot": "F02",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的表演、视觉说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "acting",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-05",
+      "film_slot": "F02",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "acting",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-06",
+      "film_slot": "F02",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "acting",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "same_author",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "Two records from the same normalized author do not satisfy two-author comparison.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-07",
+      "film_slot": "F03",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的氛围、表演说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "tone",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-08",
+      "film_slot": "F03",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-09",
+      "film_slot": "F03",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "tone",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "duplicate_text",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "Normalized copied text does not increase review coverage.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-10",
+      "film_slot": "F04",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的节奏、视觉说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "pace",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-11",
+      "film_slot": "F04",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "pace",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-12",
+      "film_slot": "F04",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "pace",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "wrong_movie_mapping",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "A title/year-only or mismatched film identity cannot supply this film's review evidence.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-13",
+      "film_slot": "F05",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的表演、节奏说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "acting",
+        "pace"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-14",
+      "film_slot": "F05",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "acting",
+        "pace"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-15",
+      "film_slot": "F05",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "acting",
+        "pace"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "stale_or_upstream_timeout",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "Expired material or an upstream timeout is labelled; old evidence is not promoted as current.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-16",
+      "film_slot": "F06",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的视觉、氛围说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "visuals",
+        "tone"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-17",
+      "film_slot": "F06",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-18",
+      "film_slot": "F06",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "visuals",
+        "tone"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "unknown_spoiler",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "A review with unknown spoiler clearance is excluded from default opinion synthesis.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-19",
+      "film_slot": "F07",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的氛围、节奏说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "tone",
+        "pace"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-20",
+      "film_slot": "F07",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "pace"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-21",
+      "film_slot": "F07",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "tone",
+        "pace"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "usage_permission_missing",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "Text without verified permitted processing/display is not sent to the model or published.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-22",
+      "film_slot": "F08",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的视觉、表演说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "visuals",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-23",
+      "film_slot": "F08",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "visuals",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-24",
+      "film_slot": "F08",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "visuals",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "invalid_record_url",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "Wrong host, title URL, or review URL/record-ID mismatch cannot support an IMDb opinion.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-25",
+      "film_slot": "F09",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的节奏、表演说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "pace",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-26",
+      "film_slot": "F09",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "pace",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-27",
+      "film_slot": "F09",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "pace",
+        "acting"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "opinion_not_supported",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "A missing, negated, ambiguous or unrecognized phrase is not replaced by a template opinion.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-28",
+      "film_slot": "F10",
+      "task_kind": "same_aspect_sample_comparison",
+      "evaluator_prompt": "比较两个版本对这部影片的氛围、视觉说明：哪个更帮助选片？指出每条说明所依据的原文；没有同主题材料时应说明不足。",
+      "aspects": [
+        "tone",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Compare only cleared, deduplicated records for this same film and aspect.",
+        "Describe agreement/disagreement only within the acquired IMDb sample; do not claim platform-wide consensus or independent publishers.",
+        "Use controlled phrases or explicitly mark unsupported interpretation; no invented opinions."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "per_aspect_exact_support_spans",
+        "author_and_record_dedup_decisions"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-29",
+      "film_slot": "F10",
+      "task_kind": "preference_explanation_and_human_citation_spoiler_audit",
+      "evaluator_prompt": "我想轻松解压。比较两个版本的适合理由、可能不适合之处和材料不足说明。逐条核对引用是否支持结论，并人工检查默认展示的片段有无剧情透露。",
+      "aspects": [
+        "tone",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "expected_behavior": [
+        "Separate acquired review statements from preference matching inferences.",
+        "Only supported light/heavy tone cues inform this implemented preference mapping; no guarantee of personal enjoyment.",
+        "Every opinion/match/caution binds an exact support span, review ID and source URL.",
+        "Unknown spoiler clearance stays excluded; a model or agent decision does not replace human signoff."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "permitted_review_excerpts",
+        "human_quote_support_decisions",
+        "human_spoiler_decisions"
+      ],
+      "blind_order_first": "X",
+      "execution_status": "not_run_requires_real_imdb"
+    },
+    {
+      "task_id": "C08-30",
+      "film_slot": "F10",
+      "task_kind": "controlled_failure_and_honest_degradation",
+      "evaluator_prompt": "在指定缺证或错误条件下比较两个版本：是否仍保留真实候选、说明缺口并避免虚构口碑？评价这个说明是否帮助理解当前推荐的局限。",
+      "aspects": [
+        "tone",
+        "visuals"
+      ],
+      "constraints": {
+        "moods": [
+          "轻松解压"
+        ]
+      },
+      "controlled_condition": "no_reviews_or_recent_title_gap",
+      "fault_mode": "labelled_local_replay_of_acquired_licensed_material_not_live_provider_failure",
+      "expected_behavior": [
+        "No usable reviews for the recent title remains a coverage failure; do not replace the film to improve the denominator.",
+        "Keep the same acquired candidate set and ranking for A/B; label material insufficiency, failure and replay separately.",
+        "This task tests degradation behavior and never counts as successful real-provider coverage."
+      ],
+      "required_gold": [
+        "verified_identity",
+        "original_acquired_response_digest",
+        "labelled_fault_manifest",
+        "expected_safe_degradation"
+      ],
+      "blind_order_first": "Y",
+      "execution_status": "not_run_requires_real_imdb"
+    }
+  ],
+  "human_review": {
+    "status": "not_run",
+    "required_roles": [
+      "A human reviewer verifies each published quote and its exact same-film source binding.",
+      "A human reviewer checks spoiler clearance for the displayed excerpt and conclusion.",
+      "Actual trial users rate decision help; agent-generated scores are not user trial evidence."
+    ],
+    "per_task_fields": [
+      "task_id",
+      "film_slot",
+      "reviewer_pseudonym",
+      "reviewed_at",
+      "application_sha",
+      "shown_first",
+      "variant_X_helpfulness_1_to_5",
+      "variant_Y_helpfulness_1_to_5",
+      "preferred_variant_or_tie_or_unusable",
+      "quote_support_pass_fail_uncertain",
+      "spoiler_safe_fail_uncertain",
+      "scope_and_authorship_claim_pass_fail",
+      "missing_evidence_disclosure_pass_fail",
+      "cited_evidence_ids",
+      "failure_codes",
+      "short_rationale"
+    ],
+    "reference_policy": "Store human gold decisions and actual permitted excerpts in ignored local artifacts; never infer gold from output being evaluated."
+  },
+  "measurement": {
+    "execution_status": "not_run_requires_real_imdb",
+    "coverage": {
+      "denominator_films": 10,
+      "denominator_tasks": 30,
+      "successful_films": null,
+      "completed_tasks": null,
+      "rule": "At least two usable distinct records/authors per film after identity, licence, freshness, spoiler and duplicate checks. Failure or missing material remains in the denominator."
+    },
+    "quality_decisions": [
+      "Report quote support, spoiler and scope failures separately from usefulness scores.",
+      "Preserve all missing/failed/uncertain cases; do not count a conservative fallback as successful review coverage.",
+      "Report paired preference counts and the number of actual human respondents. Do not claim general user value from synthetic or insufficient trials.",
+      "Define human decision thresholds before execution; this protocol does not set a passing result."
+    ],
+    "runtime_fields": [
+      "variant",
+      "task_id",
+      "trace_id",
+      "elapsed_seconds",
+      "http_calls",
+      "model_calls",
+      "cache_status",
+      "source_statuses",
+      "input_tokens_if_available",
+      "output_tokens_if_available",
+      "billed_cost_if_available",
+      "currency_if_available",
+      "failure_code",
+      "fault_injection_label"
+    ],
+    "cost_policy": "Unknown until measured or checked against provider billing; never substitute zero for missing cost."
+  },
+  "outputs": {
+    "tracked_protocol": "data/imdb/evaluation-tasks.json",
+    "local_report_directory": "artifacts/imdb-closure/c08/",
+    "suggested_files": [
+      "frozen-manifest.json",
+      "sample-manifest.json",
+      "licensed-evidence-manifest.json",
+      "human-gold.json",
+      "ab-presentation-schedule.json",
+      "task-results.json",
+      "coverage-and-failures.json",
+      "cost-and-latency.json"
+    ],
+    "secret_policy": "No credentials, raw personal interviews, user tokens or personal database in Git.",
+    "signoff_policy": "C08 human review/user trial and M12 another-physical-computer signoff remain separate. This protocol does not sign for any member."
+  }
+}

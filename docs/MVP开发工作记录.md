@@ -448,3 +448,6 @@ Get-Content -Raw -Encoding UTF8 'artifacts/mvp/model-E02-report.json'
 - 共享时限修复后使用空缓存/临时映射库再次真实测旧Apple↔TMDB三片：两次推荐均200、契约与映射通过，HTTP分别6/2；真实影评覆盖和第二次零HTTP未通过（包含无影评/来源超时），整体仍记失败，报告`tmdb-live-fixed-20261102.json`。这仅验证候选在缺证时能保留，没有完成IMDb或保证来源质量。
 - 可选综合模型额外1次联网验证通过：输入为明确标记的合成IMDb形状材料，`model_status=ok/extraction_method=model_selected`，4条受控观点、2条站内对照。报告`opinion-model-live-20261102.json`，不含模型原始输出，不是实际IMDb材料的语义/引用验收。累计本轮模型请求5次，实际费用待服务商账单。
 - 最终本机检查：后端`s0_check` **349 passed**，前端 **53 passed**，TypeScript/生产构建、格式及契约一致性通过；桌面浅色/手机深色的来源、记忆和两种观点范围浏览器检查 **24/24**，包含真实Apple来源抽屉、合成IMDb面板与Axe/窄屏检查。本轮未在本机跑全量浏览器，云端全量结果单独记录；截图和失败历史留在忽略目录，未提交个人数据或第三方正文。
+- Git恢复后业务提交`2f4607a5a5fd5434c8beb9ecefe52b2637f41acf`已推送，建立[PR #10](https://github.com/yimou408-spec/getnewmovie/pull/10)。该SHA的[后端CI](https://github.com/yimou408-spec/getnewmovie/actions/runs/41383367087)和[前端全量CI](https://github.com/yimou408-spec/getnewmovie/actions/runs/41383367029)均通过：前端53项单测、252项浏览器通过、8项专用本机模型/故障环境跳过，未把跳过计通过。完整日志留在`artifacts/imdb-closure/github-business-frontend.log`。另一次push触发结果不重复累加。
+- 最终代理复核66项相关用例通过，未发现新的阻断缺陷；不代替成员人工评审。新增C08三十任务协议`data/imdb/evaluation-tasks.json`，10个待确认影片槽位、每片3项；没有实际影片、影评、人工参考答案或结果，状态明确未运行。另一电脑签收模板已补入`local-demo.md`，M12保持进行中。
+- 后续Git连接重置/直连443失败，发现代理只监听IPv6；改用本次命令`http://[::1]:7897`成功推送`bdff453`交接文档，未修改持久Git/系统代理。业务CI成功与文档后续提交分开记录。
