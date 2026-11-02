@@ -207,6 +207,133 @@ export function SourceOpinions({
   );
 }
 
+export function OpinionSynthesis({
+  candidate,
+  evidence,
+}: {
+  candidate: Candidate;
+  evidence: Evidence[];
+}) {
+  const summary = candidate.opinion_summary;
+  if (!summary) return null;
+  const entries = new Map(
+    evidence
+      .filter(
+        (e) =>
+          e.movie_id === candidate.movie.movie_id &&
+          e.kind === "review" &&
+          e.spoiler_level === "safe" &&
+          ["licensed", "provider_terms", "synthetic"].includes(
+            e.usage_basis ?? "",
+          ),
+      )
+      .map((e) => [e.evidence_id, e]),
+  );
+  const supported = (refs: string[]) =>
+    refs.length > 0 && refs.every((id) => entries.has(id));
+  const links = (refs: string[]) => (
+    <span>
+      {" "}
+      {refs.map((id) => {
+        const entry = entries.get(id);
+        const url = safeSourceUrl(entry?.url);
+        return entry && url ? (
+          <span key={id}>
+            {" "}
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              [{entry.source} · {entry.author ?? "作者未知"}]
+            </a>{" "}
+          </span>
+        ) : null;
+      })}
+    </span>
+  );
+  const states = {
+    insufficient: "评价材料不足",
+    single_group: "仅一个独立来源组",
+    independence_unknown: "来源独立性待核验",
+    no_overlap: "材料主题尚不可对照",
+    compared: "本次材料可对照",
+  };
+  return (
+    <section className="evidence-reason" aria-label="材料观点对照">
+      <h3>材料观点对照</h3>
+      <p>
+        {summary.status === "compared" &&
+        summary.comparison_scope === "single_platform"
+          ? "本站影评样本可对照"
+          : summary.comparison_scope === "single_platform"
+            ? "本站影评样本不足以对照"
+            : states[summary.status]}
+      </p>
+      {summary.synthetic && (
+        <p className="notice warning">含离线合成材料，仅供开发验收。</p>
+      )}
+      {(summary.opinions ?? []).some((p) => supported([p.evidence_id])) && (
+        <>
+          <h4>来源中的观点片段</h4>
+          <ul>
+            {(summary.opinions ?? [])
+              .filter(
+                (p) =>
+                  supported([p.evidence_id]) &&
+                  entries.get(p.evidence_id)!.claim.includes(p.quote),
+              )
+              .map((p) => (
+                <li key={`${p.evidence_id}-${p.aspect}`}>
+                  <q>{p.quote}</q>
+                  {links([p.evidence_id])}
+                </li>
+              ))}
+          </ul>
+        </>
+      )}
+      {(summary.comparisons ?? [])
+        .filter((p) => supported(p.evidence_ids))
+        .map((p) => (
+          <p key={`${p.aspect}-${p.kind}`}>
+            <strong>
+              {p.kind === "agreement" ? "相同描述：" : "不同描述："}
+            </strong>
+            {p.text}
+            {links(p.evidence_ids)}
+          </p>
+        ))}
+      {(summary.matches ?? []).some((p) => supported(p.evidence_ids)) && (
+        <>
+          <h4>与你需求的关系（匹配推断）</h4>
+          {(summary.matches ?? [])
+            .filter((p) => supported(p.evidence_ids))
+            .map((p) => (
+              <p key={p.text}>
+                {p.text}
+                {links(p.evidence_ids)}
+              </p>
+            ))}
+        </>
+      )}
+      {(summary.cautions ?? []).some((p) => supported(p.evidence_ids)) && (
+        <>
+          <h4>可能不适合之处（匹配推断）</h4>
+          {(summary.cautions ?? [])
+            .filter((p) => supported(p.evidence_ids))
+            .map((p) => (
+              <p key={p.text}>
+                {p.text}
+                {links(p.evidence_ids)}
+              </p>
+            ))}
+        </>
+      )}
+      {(summary.limitations ?? []).map((text) => (
+        <p className="small-text muted" key={text}>
+          {text}
+        </p>
+      ))}
+    </section>
+  );
+}
+
 export function EvidenceOverview({
   movie,
   evidence,
@@ -220,7 +347,7 @@ export function EvidenceOverview({
 }) {
   const entries = evidenceForMovie(movie, evidence);
   const sites = sourceSites(entries);
-  const doubanRating = movie.ratings?.some((r) => r.source.includes("豆瓣"));
+  const imdbRating = movie.ratings?.some((r) => r.source === "IMDb");
   return (
     <div className="evidence-overview">
       {dataMode === "synthetic" && (
@@ -241,7 +368,7 @@ export function EvidenceOverview({
               : `${sites.length} 个来源站点；来源独立性尚未核验。`}
         </strong>
         <p>同一站点的多条资料不会计作多个来源，评分按原平台和量表分别展示。</p>
-        {!doubanRating && <p>豆瓣评分未获取；不代表评分低或影片未收录。</p>}
+        {!imdbRating && <p>IMDb 评分未获取；不代表评分低或影片未收录。</p>}
       </div>
       {candidate && (
         <section className="evidence-reason">
@@ -261,10 +388,15 @@ export function EvidenceOverview({
       <section>
         <h3>来源观点</h3>
         <SourceOpinions movie={movie} evidence={entries} />
-        <p className="small-text muted">
-          观点按来源并列展示。当前未生成跨来源观点差异结论。
-        </p>
+        {!candidate?.opinion_summary && (
+          <p className="small-text muted">
+            观点按来源并列展示。当前未生成跨来源观点差异结论。
+          </p>
+        )}
       </section>
+      {candidate && (
+        <OpinionSynthesis candidate={candidate} evidence={entries} />
+      )}
       <section>
         <h3>
           证据记录 <span>{entries.length} 条</span>

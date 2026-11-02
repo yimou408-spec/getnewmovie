@@ -14,6 +14,7 @@ from app.services.budget import current_budget
 
 class DoubanSource:
     source = "Douban"
+    provides_reviews = True
 
     def fetch(self, movie_id, external_id):
         import httpx
@@ -37,9 +38,13 @@ def configured_adapters(*, token=None):
 
 
 class EvidenceService:
-    def __init__(self, repository, adapters=None, *, ttl=1800, clock=time.time):
+    def __init__(self, repository, adapters=None, *, ttl=1800, clock=time.time, review_audit=None):
         self.repository, self.adapters = repository, adapters or {}
         self.ttl, self.clock, self.lock = ttl, clock, RLock()
+        self.review_audit = review_audit
+
+    def reviewed(self, result):
+        return self.review_audit.apply(result) if self.review_audit else result
 
     def collect(self, movie):
         from scripts.movie_identity import confirm_external_identity
@@ -50,11 +55,13 @@ class EvidenceService:
         # replacing Apple title/runtime or modifying the shared catalog.
         target.external_ids = movie.model_copy(deep=True).external_ids
         results = []
-        providers = {"douban", *self.adapters, *(link.provider for link in movie.external_ids or []
-                                                if link.provider in {"douban", "tmdb"})}
+        providers = {"imdb", *self.adapters, *(link.provider for link in movie.external_ids or []
+                                      if link.provider in {"douban", "tmdb", "imdb"})}
+        # IMDb is the current review target. Legacy adapters/mappings remain
+        # optional; never invent an enabled IMDb adapter or a network request.
         for provider in sorted(providers):
             adapter = self.adapters.get(provider)
-            source = getattr(adapter, "source", {"douban": "Douban", "tmdb": "TMDB"}.get(provider, provider))
+            source = getattr(adapter, "source", {"douban": "Douban", "tmdb": "TMDB", "imdb": "IMDb"}.get(provider, provider))
             identity_provider = getattr(adapter, "identity_provider", provider)
             link = next((item for item in movie.external_ids or [] if item.provider == identity_provider), None)
             if adapter is None or link is None:
@@ -70,10 +77,14 @@ class EvidenceService:
                 if cached and self.clock() - cached[0] < self.ttl:
                     result = SourceEvidenceResult.model_validate(cached[1])
                     result.cache_status = "fresh"
-                    results.append(result)
+                    results.append(self.reviewed(result))
                     continue
             try:
+                if current_budget.get():
+                    current_budget.get().check()
                 result = SourceEvidenceResult.model_validate(adapter.fetch(movie.movie_id, link.external_id))
+                if current_budget.get():
+                    current_budget.get().check()
                 if result.movie_id != movie.movie_id or result.source != source:
                     raise ValueError("adapter result bound to wrong movie/source")
             except CatalogError as error:
@@ -89,13 +100,11 @@ class EvidenceService:
             ids = {item.evidence_id for item in permitted}
             result.ratings = [rating for rating in result.ratings if rating.evidence_id in ids]
             if result.status in {"ok", "no_results"}:
-                if current_budget.get():
-                    current_budget.get().check()
                 self.repository.cache_put(movie.movie_id, source, link.external_id, self.clock(), result.model_dump(mode="json"))
             elif cached:
                 result.cache_status = "stale"
                 result.evidence = SourceEvidenceResult.model_validate(cached[1]).evidence
                 # Stale ratings are not promoted to current movie facts.
                 result.warnings.append("更新失败；保留旧材料及原采集时间，未当作最新证据。")
-            results.append(result)
+            results.append(self.reviewed(result))
         return results

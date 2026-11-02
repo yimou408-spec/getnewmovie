@@ -177,3 +177,66 @@ def test_ratings_do_not_mutate_shared_catalog_or_leak_to_later_responses():
     second = client.post("/recommendations", json=body)
     assert second.status_code == 200
     assert all(c["movie"]["ratings"] == [] for c in second.json()["candidates"])
+
+
+def test_optional_evidence_deadline_preserves_candidates_and_does_not_cache_late_results(tmp_path):
+    now, calls, limits = [0], [], []
+
+    class SlowEvidence:
+        source = "Douban"
+
+        def fetch(self, mid, external_id):
+            from app.services.budget import consume
+            calls.append(mid)
+            limits.append(consume(timeout=8))
+            now[0] += 15
+            return SourceEvidenceResult(movie_id=mid, source=self.source, status="no_results")
+
+    catalog = CatalogDouble()
+    repo = Repository(tmp_path / "optional.sqlite3")
+    for movie, _ in catalog.pool([]):
+        repo.register_mapping(movie.movie_id, ExternalMovieIdentity(provider="douban",
+            external_id=movie.movie_id.split(":")[1], status="confirmed", basis="human_verified",
+            url=f"https://movie.douban.com/subject/{movie.movie_id.split(':')[1]}/"))
+    service = EvidenceService(repo, {"douban": SlowEvidence()})
+    budget = RequestBudget(clock=lambda: now[0], seconds=45)
+    with TestClient(create_app(catalog, repository=repo, evidence_service=service,
+                              budget_factory=lambda: budget)) as client:
+        response = client.post("/recommendations", json=dict(mode="discover", query="look", session_id="legacy"))
+    assert response.status_code == 200
+    assert len(response.json()["candidates"]) == 3
+    records = [r for r in response.json()["source_results"] if r["source"] == "Douban"]
+    assert len(records) == 3 and all(r["status"] == "timeout" for r in records)
+    assert len(calls) == budget.http_calls == 1 and limits == [8]
+    assert repo.connection.execute("SELECT count(*) FROM evidence_cache").fetchone()[0] == 0
+    repo.close()
+
+
+def test_optional_budget_shares_parent_counters_and_does_not_extend_total_deadline():
+    from app.services.budget import optional_budget_scope
+    now = [0]
+    parent = RequestBudget(clock=lambda: now[0], seconds=6, max_http=2)
+    with budget_scope(parent):
+        with optional_budget_scope(seconds=12, reserve=1) as child:
+            assert child.consume(timeout=8) == 5
+            now[0] = 5
+            with pytest.raises(CatalogError):
+                child.consume()
+        assert parent.http_calls == 1 and parent.check() == 1
+
+
+def test_optional_timeout_returns_stale_cache_without_promoting_old_evidence(tmp_path):
+    from app.services.budget import optional_budget_scope
+    now = [0]
+    repo, adapter = Repository(tmp_path / "stale.sqlite3"), Adapter()
+    service = EvidenceService(repo, {"douban": adapter}, clock=lambda: now[0], ttl=10)
+    first = next(r for r in service.collect(film()) if r.source == "Douban")
+    now[0] = 20
+    parent = RequestBudget(clock=lambda: now[0])
+    with budget_scope(parent):
+        with optional_budget_scope(seconds=0):
+            stale = next(r for r in service.collect(film()) if r.source == "Douban")
+    assert stale.status == "timeout" and stale.cache_status == "stale" and not stale.ratings
+    assert stale.evidence == first.evidence and adapter.calls == 1
+    assert repo.cache_get("itunes:101", "Douban", "123")[0] == 0
+    repo.close()

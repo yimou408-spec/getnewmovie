@@ -809,6 +809,16 @@
             "type": "array",
             "minItems": 1,
             "title": "Availability"
+          },
+          "opinion_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OpinionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1218,13 +1228,14 @@
             "enum": [
               "douban",
               "tmdb",
+              "imdb",
               "itunes"
             ],
             "title": "Provider"
           },
           "external_id": {
             "type": "string",
-            "pattern": "^[1-9][0-9]*$",
+            "pattern": "^(?:[1-9][0-9]*|tt[0-9]{7,})$",
             "title": "External Id"
           },
           "status": {
@@ -1790,6 +1801,242 @@
           "requires_confirmation"
         ],
         "title": "MovieSearchResponse"
+      },
+      "OpinionComparison": {
+        "properties": {
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "pace",
+              "tone",
+              "acting",
+              "visuals"
+            ],
+            "title": "Aspect"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "agreement",
+              "disagreement"
+            ],
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 2,
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "aspect",
+          "kind",
+          "text",
+          "evidence_ids"
+        ],
+        "title": "OpinionComparison"
+      },
+      "OpinionMatch": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "evidence_ids"
+        ],
+        "title": "OpinionMatch"
+      },
+      "OpinionSelection": {
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Evidence Id"
+          },
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "pace",
+              "tone",
+              "acting",
+              "visuals"
+            ],
+            "title": "Aspect"
+          },
+          "value": {
+            "type": "string",
+            "enum": [
+              "slow",
+              "brisk",
+              "light",
+              "heavy",
+              "strong",
+              "weak"
+            ],
+            "title": "Value"
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Quote"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "aspect",
+          "value",
+          "quote"
+        ],
+        "title": "OpinionSelection"
+      },
+      "OpinionSummary": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "insufficient",
+              "single_group",
+              "independence_unknown",
+              "no_overlap",
+              "compared"
+            ],
+            "title": "Status"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "title": "Synthetic"
+          },
+          "comparison_scope": {
+            "type": "string",
+            "enum": [
+              "single_platform",
+              "independent_sources"
+            ],
+            "title": "Comparison Scope",
+            "default": "independent_sources"
+          },
+          "extraction_method": {
+            "type": "string",
+            "enum": [
+              "controlled_phrases",
+              "model_selected"
+            ],
+            "title": "Extraction Method",
+            "default": "controlled_phrases"
+          },
+          "model_status": {
+            "type": "string",
+            "enum": [
+              "not_enabled",
+              "ok",
+              "invalid_output",
+              "unavailable",
+              "budget_exhausted"
+            ],
+            "title": "Model Status",
+            "default": "not_enabled"
+          },
+          "independent_group_count": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Independent Group Count"
+          },
+          "opinions": {
+            "items": {
+              "$ref": "#/components/schemas/OpinionSelection"
+            },
+            "type": "array",
+            "maxItems": 24,
+            "title": "Opinions"
+          },
+          "comparisons": {
+            "items": {
+              "$ref": "#/components/schemas/OpinionComparison"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Comparisons"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/OpinionMatch"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Matches"
+          },
+          "cautions": {
+            "items": {
+              "$ref": "#/components/schemas/OpinionMatch"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Cautions"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Limitations"
+          },
+          "followup_status": {
+            "type": "string",
+            "enum": [
+              "not_needed",
+              "not_configured",
+              "completed",
+              "failed",
+              "budget_exhausted",
+              "safety_review_needed",
+              "source_unavailable"
+            ],
+            "title": "Followup Status",
+            "default": "not_needed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "synthetic",
+          "independent_group_count"
+        ],
+        "title": "OpinionSummary"
       },
       "PreferencesResponse": {
         "properties": {

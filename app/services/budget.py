@@ -50,6 +50,33 @@ def budget_scope(budget):
         current_budget.reset(token)
 
 
+class OptionalBudget:
+    """A shorter phase deadline sharing the request's counters and hard limit."""
+    def __init__(self, parent, seconds, reserve):
+        self.parent = parent
+        self.clock = parent.clock
+        self.deadline = self.clock() + max(0, min(seconds, parent.check() - reserve))
+
+    def check(self):
+        remaining = min(self.parent.check(), self.deadline - self.clock())
+        if remaining <= 0:
+            raise CatalogError("UPSTREAM_TIMEOUT", "可选评价查询已达到等待上限。", 504)
+        return remaining
+
+    def consume(self, *, search=False, timeout=10):
+        return self.parent.consume(search=search, timeout=min(timeout, self.check()))
+
+
+@contextmanager
+def optional_budget_scope(*, seconds=12, reserve=1):
+    parent = current_budget.get()
+    if parent is None:
+        yield None
+    else:
+        with budget_scope(OptionalBudget(parent, seconds, reserve)) as child:
+            yield child
+
+
 def consume(*, search=False, timeout=10):
     budget = current_budget.get()
     return budget.consume(search=search, timeout=timeout) if budget else timeout

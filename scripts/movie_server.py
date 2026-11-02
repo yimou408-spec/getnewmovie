@@ -26,8 +26,9 @@ from scripts.movie_sources import CatalogRouter
 from app.services.storage import Repository, StoreError
 from app.services.memory import apply_memory, bounded_exclusions
 from app.services.evidence import EvidenceService
+from app.services.opinions import OpinionPipeline
 from app.services.request_limits import RequestLimits
-from app.services.budget import RequestBudget, catalog_lock, consume, current_budget
+from app.services.budget import RequestBudget, catalog_lock, consume, current_budget, optional_budget_scope
 from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
                                   MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities, SessionResponse,
                                   IdentityResponse, PreferencesWrite, PreferencesResponse, SeenResponse,
@@ -35,7 +36,7 @@ from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, Er
 
 
 def create_app(catalog=None, *, model_factory=None, repository=None, evidence_service=None, budget_factory=RequestBudget,
-               settings=None, frontend_dir=None, intent_parser=None, backup_catalog=None):
+               settings=None, frontend_dir=None, intent_parser=None, backup_catalog=None, opinion_factory=None):
     production = catalog is None
     settings = settings or Settings.load()
     catalog = catalog or (TMDBCatalog(settings.tmdb_read_token) if settings.provider == "tmdb" else AppleCatalog())
@@ -47,7 +48,14 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
     repository = repository or Repository((os.getenv("MOVIE_DB_PATH") or Path(__file__).resolve().parents[1] / "artifacts/state/movie.sqlite3") if production else ":memory:")
     if evidence_service is None:
         from app.services.evidence import configured_adapters
-        evidence_service = EvidenceService(repository, configured_adapters(token=settings.tmdb_read_token) if production else {})
+        from app.services.review_audit import ReviewAudit
+        audit_path = os.getenv('MOVIE_REVIEW_AUDIT_PATH')
+        audit = ReviewAudit(ROOT / audit_path) if production and audit_path else None
+        evidence_service = EvidenceService(repository, configured_adapters(token=settings.tmdb_read_token) if production else {},
+                                           review_audit=audit)
+    if opinion_factory is None:
+        from scripts.opinion_model import configured_opinion_factory
+        opinion_factory = configured_opinion_factory(settings) if production else OpinionPipeline
     sessions = IntentSessions(parser=intent_parser)
     agent_contexts = {}
     workflow = AgentWorkflow(catalog, model_factory) if model_factory else None
@@ -125,10 +133,12 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
 
     @router.get("/health", response_model=HealthResponse)
     def health():
+        reviews = any(getattr(adapter, "provides_reviews", False) is True
+                      for adapter in getattr(evidence_service, "adapters", {}).values())
         return HealthResponse(service="real-catalog", provider=catalog.source_name, synthetic_fallback=False,
                               cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, ratings=catalog.id_prefix == "tmdb", natural_language=True, long_term_memory=True,
                                                                                       model_understanding=workflow is not None,
-                                                                                      reviews="tmdb_reviews" in getattr(evidence_service, "adapters", {})))
+                                                                                      reviews=reviews))
 
     @router.get("/configuration", response_model=RuntimeConfiguration)
     def configuration():
@@ -345,20 +355,25 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
                 catalog_size=agent_result.catalog_size if agent_result is not None else len(films),
                 matched_count=agent_result.matched_count if agent_result is not None else len(eligible), interpretation=interpretation)
         source_results = []
-        for candidate in response.candidates:
-            results = evidence_service.collect(candidate.movie)
-            source_results.extend(results)
-            for result in results:
-                # Unverified use permissions never publish acquired review text.
-                permitted = [e for e in result.evidence if e.usage_basis in {"licensed", "provider_terms", "synthetic"}]
-                result.evidence = permitted
-                safe_ids = {e.evidence_id for e in permitted if e.spoiler_level == "safe"}
-                result.ratings = [rating for rating in result.ratings if rating.evidence_id in safe_ids]
-                response.evidence.extend(permitted)
-                if result.status == "ok" and result.cache_status != "stale":
-                    candidate.movie.ratings.extend(result.ratings)
-                if result.status not in {"ok", "no_results"}:
-                    response.warnings.append(f"{candidate.movie.title} · {result.source}：{result.status}。")
+        opinion_pipeline = opinion_factory()
+        with optional_budget_scope():
+            for candidate in response.candidates:
+                results = evidence_service.collect(candidate.movie)
+                summary, additions = opinion_pipeline.run(candidate.movie.movie_id, c, results)
+                results = [*results, *additions]
+                candidate.opinion_summary = summary
+                source_results.extend(results)
+                for result in results:
+                    # Unverified use permissions never publish acquired review text.
+                    permitted = [e for e in result.evidence if e.usage_basis in {"licensed", "provider_terms", "synthetic"}]
+                    result.evidence = permitted
+                    safe_ids = {e.evidence_id for e in permitted if e.spoiler_level == "safe"}
+                    result.ratings = [rating for rating in result.ratings if rating.evidence_id in safe_ids]
+                    response.evidence.extend(permitted)
+                    if result.status == "ok" and result.cache_status != "stale":
+                        candidate.movie.ratings.extend(result.ratings)
+                    if result.status not in {"ok", "no_results"}:
+                        response.warnings.append(f"{candidate.movie.title} · {result.source}：{result.status}。")
         response.source_results = source_results
         if owner:
             repository.authenticate_authorized_owner(owner)

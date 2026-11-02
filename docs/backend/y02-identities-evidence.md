@@ -255,3 +255,18 @@ $env:MOVIE_TMDB_REVIEWS_LIVE = '1'
 - 本轮无新增依赖或契约字段变化；TDD先见缺模块/缺验收函数/缺作者UI与health能力失败，再实现。最终自动检查记录追加在下方；通过范围为工程、TMDB单源影评获取和本机真实页面，完整产品验收仍未通过。
 
 最终工程结果：`python -m scripts.s0_check` **220 passed**（示例、30+30种子、契约与后端测试）；前端 **40 passed**，`npm run build`、`format:check`、`types:check`均通过；`git diff --check`通过，数据库integrity=ok/schema=3。真实影评推荐9项、Chrome页面2项通过，零付费模型HTTP。测试与截图对应本节代码增量；临时报告和数据库未纳入Git。完整验收结论：**未达到**，剩余条件为真实模型配置及M11实测、豆瓣可用且可引用的评价通路、独立性核验与口碑对照、M12独立复现/签收。
+
+## 2026-11-01 22:45 北京时间：AntSpider参考审阅后的单ID通路验证
+
+- 用户要求按AntSpider审阅建议继续。静态核对压缩包91个文件与解压项目一致；其电影模块使用同一豆瓣详情/短评公开页面，字段提取可参考，不能证明当前安全验证可通过。未安装其2019年依赖、运行批量爬虫、导入MySQL表或更改用户提供的项目。
+- 身份核验前置尚未满足：历史搜索匹配《Before Sunrise》(1995)的豆瓣1296339只是候选，无已确认Apple/TMDB映射。本次尝试查询Wikidata作独立身份参考，1次HTTP403，无可用结果；故保持pending_review，不将显式传入ID等同于确认映射，不写生产数据库。
+- 在现有 `scripts/douban_probe.py` 增加 `--subject-id`：单个明确ID，最多4次HTTP，两轮每轮详情/短评各一次。首轮两页均取得评分/短评并解析成功才执行第二轮；任一失败/受限/空结果立即停止，不自动重试。两轮成功也仅是小样本采集结果，不证明持续稳定或完整多源通过。报告不保存HTML、评论正文、Cookie、重定向查询参数。
+- 2026-11-01T14:44:57Z真实直连1296339：实际2次HTTP，`/subject/1296339/`和`/subject/1296339/comments/`均302至 `sec.douban.com/c`；access_limited=2、评分0、短评0，未执行第二轮，`two_round_acquisition_passed=false`。本机报告 `artifacts/douban/antspider-subject-1296339.json`。未登录、跟随挑战跳转、更换代理或启动并发采集。
+- 结论：当前阻塞仍为页面访问限制，尚不能验证真实页面解析。按用户认可的顺序，通路可用后再补导演/IMDb ID等解析；本轮未复制AntSpider解析代码，未接入其历史数据、推断许可或确认身份。后续需要可访问的允许通路，并用影片版本/年份/导演/IMDb等核验映射；同一受限路径反复请求不会作为后续进展。
+
+单ID复现命令（受限时只请求首轮两页）：
+
+```powershell
+$env:DOUBAN_PROBE_NETWORK = 'direct'
+python -m scripts.douban_probe --live --subject-id 1296339 --max-requests 4 --timeout 8 --output artifacts/douban/antspider-subject-1296339.json
+```

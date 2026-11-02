@@ -36,6 +36,104 @@ export function validateResponse(raw: unknown): Recommendation {
   )
     throw new Error("服务返回的候选状态不完整。");
   for (const c of raw.candidates) {
+    const summary = c.opinion_summary;
+    if (summary) {
+      const supported = new Map(
+        (summary.opinions ?? []).map((p) => [
+          p.evidence_id,
+          evidence.get(p.evidence_id),
+        ]),
+      );
+      for (const p of summary.opinions ?? []) {
+        const e = supported.get(p.evidence_id);
+        if (
+          !e ||
+          e.movie_id !== c.movie.movie_id ||
+          e.kind !== "review" ||
+          e.spoiler_level !== "safe" ||
+          !e.author ||
+          ((summary.comparison_scope === "single_platform" ||
+            e.source === "IMDb") &&
+            (e.source !== "IMDb" ||
+              !/^rw[0-9]{7,}$/.test(e.source_content_id ?? "") ||
+              e.url !==
+                `https://www.imdb.com/review/${e.source_content_id}/`)) ||
+          (raw.source_results ?? []).some(
+            (r) =>
+              (r.evidence ?? []).some(
+                (item) => item.evidence_id === p.evidence_id,
+              ) &&
+              (r.status !== "ok" || r.cache_status === "stale"),
+          ) ||
+          !["licensed", "provider_terms", "synthetic"].includes(
+            e.usage_basis ?? "",
+          ) ||
+          !e.claim.includes(p.quote)
+        )
+          throw new Error("观点缺少同片安全原文支持。");
+      }
+      for (const p of [
+        ...(summary.comparisons ?? []),
+        ...(summary.matches ?? []),
+        ...(summary.cautions ?? []),
+      ])
+        if (p.evidence_ids.some((id) => !supported.get(id)))
+          throw new Error("观点对照缺少引用。");
+      for (const p of summary.comparisons ?? []) {
+        const refs = p.evidence_ids.map((id) => supported.get(id)!);
+        const groups = new Set(
+          p.evidence_ids
+            .map((id) => supported.get(id)?.independent_source_group)
+            .filter(Boolean),
+        );
+        const singlePlatform = summary.comparison_scope === "single_platform";
+        const sources = new Set(refs.map((e) => e.source));
+        const hosts = new Set(
+          refs
+            .map((e) => safeSourceUrl(e.url))
+            .map((url) => (url ? new URL(url).hostname : null)),
+        );
+        const authors = new Set(
+          refs.map((e) =>
+            (e.author ?? "").normalize("NFKC").trim().toLowerCase(),
+          ),
+        );
+        const contentIds = refs.map((e) => e.source_content_id);
+        const textKeys = refs.map((e) =>
+          e.claim
+            .normalize("NFKC")
+            .replace(/[\p{P}\p{Z}\p{S}]/gu, "")
+            .toLowerCase(),
+        );
+        if (
+          (singlePlatform
+            ? sources.size !== 1 ||
+              hosts.size !== 1 ||
+              hosts.has(null) ||
+              authors.size < 2 ||
+              authors.has("") ||
+              contentIds.some((id) => !id) ||
+              new Set(contentIds).size !== refs.length ||
+              new Set(refs.map((e) => e.url)).size !== refs.length ||
+              new Set(textKeys).size !== refs.length
+            : groups.size < 2) ||
+          p.evidence_ids.some(
+            (id) =>
+              !(summary.opinions ?? []).some(
+                (o) => o.evidence_id === id && o.aspect === p.aspect,
+              ),
+          )
+        )
+          throw new Error("观点对照需要符合所声明范围的同主题材料。");
+      }
+      if (
+        (summary.opinions ?? []).some(
+          (p) => evidence.get(p.evidence_id)?.usage_basis === "synthetic",
+        ) &&
+        !summary.synthetic
+      )
+        throw new Error("合成观点必须明确标记。");
+    }
     if (c.movie.ratings?.some((r) => r.value > r.scale))
       throw new Error("评分超出了来源量表。");
     for (const id of [

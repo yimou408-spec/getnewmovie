@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EvidenceOverview, Ratings, TMDBAttribution } from "./evidence";
+import {
+  EvidenceOverview,
+  Ratings,
+  TMDBAttribution,
+  OpinionSynthesis,
+} from "./evidence";
 import { evidenceForMovie, snapshotForComparison } from "./evidence-model";
 import { validateResponse, type Recommendation } from "./domain";
 import fixture from "../../../contracts/examples/success.json";
@@ -9,6 +14,120 @@ import fixture from "../../../contracts/examples/success.json";
 // Contract fixtures are used only in offline tests, never in the running app.
 afterEach(cleanup);
 const response = () => structuredClone(fixture) as Recommendation;
+const imdbResponse = () => {
+  const data = response();
+  const candidate = data.candidates[0];
+  const evidence = ["a", "b"].map((id) => ({
+    ...data.evidence[0],
+    evidence_id: id,
+    movie_id: candidate.movie.movie_id,
+    source: "IMDb",
+    url: `https://www.imdb.com/review/rw000000${id === "a" ? "1" : "2"}/`,
+    kind: "review" as const,
+    granularity: "excerpt" as const,
+    spoiler_level: "safe" as const,
+    usage_basis: "synthetic" as const,
+    author: `Invented ${id}`,
+    source_content_id: `rw000000${id === "a" ? "1" : "2"}`,
+    independent_source_group: null,
+    claim: id === "a" ? "Synthetic: slow-paced." : "Synthetic: fast-paced.",
+  }));
+  candidate.opinion_summary = {
+    status: "compared",
+    synthetic: true,
+    comparison_scope: "single_platform",
+    independent_group_count: 0,
+    extraction_method: "controlled_phrases",
+    model_status: "not_enabled",
+    followup_status: "not_needed",
+    opinions: evidence.map((e, i) => ({
+      evidence_id: e.evidence_id,
+      aspect: "pace",
+      value: i ? "brisk" : "slow",
+      quote: i ? "fast-paced" : "slow-paced",
+    })),
+    comparisons: [
+      {
+        aspect: "pace",
+        kind: "disagreement",
+        text: "本次 IMDb 站内材料对节奏的描述不同。",
+        evidence_ids: ["a", "b"],
+      },
+    ],
+    matches: [],
+    cautions: [],
+    limitations: ["单平台样本，不代表全网。"],
+  };
+  data.evidence.push(...evidence);
+  return data;
+};
+
+it("shows scoped opinion comparison with citations and inference labels", () => {
+  const data = response();
+  const candidate = data.candidates[0];
+  const evidence = ["a", "b"].map((id) => ({
+    ...data.evidence[0],
+    evidence_id: id,
+    movie_id: candidate.movie.movie_id,
+    source: `Offline ${id}`,
+    url: `https://example.com/${id}`,
+    kind: "review" as const,
+    granularity: "excerpt" as const,
+    spoiler_level: "safe" as const,
+    usage_basis: "synthetic" as const,
+    author: id,
+    independent_source_group: id,
+    claim: "氛围轻松。",
+  }));
+  candidate.opinion_summary = {
+    status: "compared",
+    synthetic: true,
+    comparison_scope: "independent_sources",
+    independent_group_count: 2,
+    opinions: evidence.map((e) => ({
+      evidence_id: e.evidence_id,
+      aspect: "tone",
+      value: "light",
+      quote: "氛围轻松",
+    })),
+    comparisons: [
+      {
+        aspect: "tone",
+        kind: "agreement",
+        text: "本次材料均提到轻松氛围。",
+        evidence_ids: ["a", "b"],
+      },
+    ],
+    matches: [{ text: "符合本次放松需求。", evidence_ids: ["a"] }],
+    cautions: [],
+    limitations: ["不代表全网口碑。"],
+    extraction_method: "controlled_phrases",
+    model_status: "not_enabled",
+    followup_status: "not_needed",
+  };
+  const wire = { ...data, evidence: [...data.evidence, ...evidence] };
+  expect(() => validateResponse(wire)).not.toThrow();
+  const forged = structuredClone(wire);
+  forged.candidates[0].opinion_summary!.opinions![0].quote = "编造观点";
+  expect(() => validateResponse(forged)).toThrow();
+  const duplicate = structuredClone(wire);
+  duplicate.evidence.find(
+    (e) => e.evidence_id === "b",
+  )!.independent_source_group = "a";
+  expect(() => validateResponse(duplicate)).toThrow();
+  render(<OpinionSynthesis candidate={candidate} evidence={evidence} />);
+  expect(screen.getByRole("heading", { name: "材料观点对照" })).toBeVisible();
+  expect(screen.getByText(/离线合成材料/)).toBeVisible();
+  expect(screen.getByText("与你需求的关系（匹配推断）")).toBeVisible();
+  expect(screen.getAllByRole("link", { name: /Offline a/ })[0]).toHaveAttribute(
+    "href",
+    "https://example.com/a",
+  );
+  evidence[0].spoiler_level = "unknown" as "safe";
+  cleanup();
+  render(<OpinionSynthesis candidate={candidate} evidence={evidence} />);
+  expect(screen.queryByText("本次材料均提到轻松氛围。")).toBeNull();
+});
 
 describe("evidence identity and provenance", () => {
   it("shows TMDB attribution with an accessible logo and official source link", () => {
@@ -94,9 +213,79 @@ describe("per-film evidence display", () => {
     render(<EvidenceOverview movie={movie} evidence={[]} />);
     expect(screen.getByText("缺少可核对来源")).toBeVisible();
     expect(
-      screen.getByText("豆瓣评分未获取；不代表评分低或影片未收录。"),
+      screen.getByText("IMDb 评分未获取；不代表评分低或影片未收录。"),
     ).toBeVisible();
     expect(screen.getByText("尚未获取来源观点。")).toBeVisible();
+  });
+
+  it("accepts explicitly scoped IMDb sample comparisons without invented independence", () => {
+    const data = imdbResponse();
+    const candidate = data.candidates[0];
+    const evidence = data.evidence.filter((e) =>
+      ["a", "b"].includes(e.evidence_id),
+    );
+    const wire = data;
+    expect(() => validateResponse(wire)).not.toThrow();
+    const forged = structuredClone(wire);
+    forged.candidates[0].opinion_summary!.comparison_scope =
+      "independent_sources";
+    expect(() => validateResponse(forged)).toThrow();
+    const sameAuthor = structuredClone(wire);
+    sameAuthor.evidence.find((e) => e.evidence_id === "b")!.author =
+      "Invented a";
+    expect(() => validateResponse(sameAuthor)).toThrow();
+    const noId = structuredClone(wire);
+    noId.evidence.find((e) => e.evidence_id === "b")!.source_content_id = null;
+    expect(() => validateResponse(noId)).toThrow();
+    render(<OpinionSynthesis candidate={candidate} evidence={evidence} />);
+    expect(screen.getByText("本站影评样本可对照")).toBeVisible();
+  });
+
+  it.each([
+    "https://other.example/review/rw0000002/",
+    "https://www.imdb.com/review/rw0000001/",
+    "https://www.imdb.com/title/tt0000002/",
+    "http://www.imdb.com/review/rw0000002/",
+    "https://www.imdb.com/review/rw0000002/?tracking=x",
+    "https://www.imdb.com/review/rw0000002/#fragment",
+    "https://user@www.imdb.com/review/rw0000002/",
+    "https://www.imdb.com:444/review/rw0000002/",
+  ])("rejects IMDb opinions with an unbound review URL: %s", (url) => {
+    const data = imdbResponse();
+    data.evidence.find((e) => e.evidence_id === "b")!.url = url;
+    expect(() => validateResponse(data)).toThrow();
+  });
+
+  it("rejects a different platform relabelled as the single-platform target", () => {
+    const data = imdbResponse();
+    for (const e of data.evidence.filter((e) =>
+      ["a", "b"].includes(e.evidence_id),
+    )) {
+      e.source = "Different platform";
+    }
+    expect(() => validateResponse(data)).toThrow();
+  });
+
+  it("rejects duplicate IMDb review URLs with relabelled evidence IDs", () => {
+    const data = imdbResponse();
+    const a = data.evidence.find((e) => e.evidence_id === "a")!;
+    const b = data.evidence.find((e) => e.evidence_id === "b")!;
+    b.url = a.url;
+    b.source_content_id = a.source_content_id;
+    expect(() => validateResponse(data)).toThrow();
+  });
+
+  it("checks IMDb record binding for a single opinion used only in a match", () => {
+    const data = imdbResponse();
+    const summary = data.candidates[0].opinion_summary!;
+    summary.status = "independence_unknown";
+    summary.opinions = summary.opinions!.slice(0, 1);
+    summary.comparisons = [];
+    summary.matches = [{ text: "Synthetic inference", evidence_ids: ["a"] }];
+    expect(() => validateResponse(data)).not.toThrow();
+    data.evidence.find((e) => e.evidence_id === "a")!.url =
+      "https://other.example/review/rw0000001/";
+    expect(() => validateResponse(data)).toThrow();
   });
 
   it("counts websites instead of relabelled links as independent sources", () => {
