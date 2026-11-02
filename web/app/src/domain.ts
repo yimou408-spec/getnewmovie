@@ -52,6 +52,12 @@ export function validateResponse(raw: unknown): Recommendation {
           e.kind !== "review" ||
           e.spoiler_level !== "safe" ||
           !e.author ||
+          ((summary.comparison_scope === "single_platform" ||
+            e.source === "IMDb") &&
+            (e.source !== "IMDb" ||
+              !/^rw[0-9]{7,}$/.test(e.source_content_id ?? "") ||
+              e.url !==
+                `https://www.imdb.com/review/${e.source_content_id}/`)) ||
           (raw.source_results ?? []).some(
             (r) =>
               (r.evidence ?? []).some(
@@ -74,13 +80,43 @@ export function validateResponse(raw: unknown): Recommendation {
         if (p.evidence_ids.some((id) => !supported.get(id)))
           throw new Error("观点对照缺少引用。");
       for (const p of summary.comparisons ?? []) {
+        const refs = p.evidence_ids.map((id) => supported.get(id)!);
         const groups = new Set(
           p.evidence_ids
             .map((id) => supported.get(id)?.independent_source_group)
             .filter(Boolean),
         );
+        const singlePlatform = summary.comparison_scope === "single_platform";
+        const sources = new Set(refs.map((e) => e.source));
+        const hosts = new Set(
+          refs
+            .map((e) => safeSourceUrl(e.url))
+            .map((url) => (url ? new URL(url).hostname : null)),
+        );
+        const authors = new Set(
+          refs.map((e) =>
+            (e.author ?? "").normalize("NFKC").trim().toLowerCase(),
+          ),
+        );
+        const contentIds = refs.map((e) => e.source_content_id);
+        const textKeys = refs.map((e) =>
+          e.claim
+            .normalize("NFKC")
+            .replace(/[\p{P}\p{Z}\p{S}]/gu, "")
+            .toLowerCase(),
+        );
         if (
-          groups.size < 2 ||
+          (singlePlatform
+            ? sources.size !== 1 ||
+              hosts.size !== 1 ||
+              hosts.has(null) ||
+              authors.size < 2 ||
+              authors.has("") ||
+              contentIds.some((id) => !id) ||
+              new Set(contentIds).size !== refs.length ||
+              new Set(refs.map((e) => e.url)).size !== refs.length ||
+              new Set(textKeys).size !== refs.length
+            : groups.size < 2) ||
           p.evidence_ids.some(
             (id) =>
               !(summary.opinions ?? []).some(
@@ -88,7 +124,7 @@ export function validateResponse(raw: unknown): Recommendation {
               ),
           )
         )
-          throw new Error("观点对照需要相同主题的独立来源。");
+          throw new Error("观点对照需要符合所声明范围的同主题材料。");
       }
       if (
         (summary.opinions ?? []).some(

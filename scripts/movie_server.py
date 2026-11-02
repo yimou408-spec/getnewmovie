@@ -28,7 +28,7 @@ from app.services.memory import apply_memory, bounded_exclusions
 from app.services.evidence import EvidenceService
 from app.services.opinions import OpinionPipeline
 from app.services.request_limits import RequestLimits
-from app.services.budget import RequestBudget, catalog_lock, consume, current_budget
+from app.services.budget import RequestBudget, catalog_lock, consume, current_budget, optional_budget_scope
 from scripts.s0_contracts import (Availability, Candidate, ComparisonRequest, ErrorResponse, Evidence, HealthResponse, Movie,
                                   MovieSearchResponse, Reason, RecommendationRequest, RecommendationResponse, ServiceCapabilities, SessionResponse,
                                   IdentityResponse, PreferencesWrite, PreferencesResponse, SeenResponse,
@@ -133,10 +133,12 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
 
     @router.get("/health", response_model=HealthResponse)
     def health():
+        reviews = any(getattr(adapter, "provides_reviews", False) is True
+                      for adapter in getattr(evidence_service, "adapters", {}).values())
         return HealthResponse(service="real-catalog", provider=catalog.source_name, synthetic_fallback=False,
                               cache_ttl_seconds=1800, capabilities=ServiceCapabilities(metadata=True, ratings=catalog.id_prefix == "tmdb", natural_language=True, long_term_memory=True,
                                                                                       model_understanding=workflow is not None,
-                                                                                      reviews="tmdb_reviews" in getattr(evidence_service, "adapters", {})))
+                                                                                      reviews=reviews))
 
     @router.get("/configuration", response_model=RuntimeConfiguration)
     def configuration():
@@ -354,23 +356,24 @@ def create_app(catalog=None, *, model_factory=None, repository=None, evidence_se
                 matched_count=agent_result.matched_count if agent_result is not None else len(eligible), interpretation=interpretation)
         source_results = []
         opinion_pipeline = opinion_factory()
-        for candidate in response.candidates:
-            results = evidence_service.collect(candidate.movie)
-            summary, additions = opinion_pipeline.run(candidate.movie.movie_id, c, results)
-            results = [*results, *additions]
-            candidate.opinion_summary = summary
-            source_results.extend(results)
-            for result in results:
-                # Unverified use permissions never publish acquired review text.
-                permitted = [e for e in result.evidence if e.usage_basis in {"licensed", "provider_terms", "synthetic"}]
-                result.evidence = permitted
-                safe_ids = {e.evidence_id for e in permitted if e.spoiler_level == "safe"}
-                result.ratings = [rating for rating in result.ratings if rating.evidence_id in safe_ids]
-                response.evidence.extend(permitted)
-                if result.status == "ok" and result.cache_status != "stale":
-                    candidate.movie.ratings.extend(result.ratings)
-                if result.status not in {"ok", "no_results"}:
-                    response.warnings.append(f"{candidate.movie.title} · {result.source}：{result.status}。")
+        with optional_budget_scope():
+            for candidate in response.candidates:
+                results = evidence_service.collect(candidate.movie)
+                summary, additions = opinion_pipeline.run(candidate.movie.movie_id, c, results)
+                results = [*results, *additions]
+                candidate.opinion_summary = summary
+                source_results.extend(results)
+                for result in results:
+                    # Unverified use permissions never publish acquired review text.
+                    permitted = [e for e in result.evidence if e.usage_basis in {"licensed", "provider_terms", "synthetic"}]
+                    result.evidence = permitted
+                    safe_ids = {e.evidence_id for e in permitted if e.spoiler_level == "safe"}
+                    result.ratings = [rating for rating in result.ratings if rating.evidence_id in safe_ids]
+                    response.evidence.extend(permitted)
+                    if result.status == "ok" and result.cache_status != "stale":
+                        candidate.movie.ratings.extend(result.ratings)
+                    if result.status not in {"ok", "no_results"}:
+                        response.warnings.append(f"{candidate.movie.title} · {result.source}：{result.status}。")
         response.source_results = source_results
         if owner:
             repository.authenticate_authorized_owner(owner)

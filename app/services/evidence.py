@@ -14,6 +14,7 @@ from app.services.budget import current_budget
 
 class DoubanSource:
     source = "Douban"
+    provides_reviews = True
 
     def fetch(self, movie_id, external_id):
         import httpx
@@ -54,11 +55,13 @@ class EvidenceService:
         # replacing Apple title/runtime or modifying the shared catalog.
         target.external_ids = movie.model_copy(deep=True).external_ids
         results = []
-        providers = {"douban", *self.adapters, *(link.provider for link in movie.external_ids or []
-                                                if link.provider in {"douban", "tmdb"})}
+        providers = {"imdb", *self.adapters, *(link.provider for link in movie.external_ids or []
+                                      if link.provider in {"douban", "tmdb", "imdb"})}
+        # IMDb is the current review target. Legacy adapters/mappings remain
+        # optional; never invent an enabled IMDb adapter or a network request.
         for provider in sorted(providers):
             adapter = self.adapters.get(provider)
-            source = getattr(adapter, "source", {"douban": "Douban", "tmdb": "TMDB"}.get(provider, provider))
+            source = getattr(adapter, "source", {"douban": "Douban", "tmdb": "TMDB", "imdb": "IMDb"}.get(provider, provider))
             identity_provider = getattr(adapter, "identity_provider", provider)
             link = next((item for item in movie.external_ids or [] if item.provider == identity_provider), None)
             if adapter is None or link is None:
@@ -77,7 +80,11 @@ class EvidenceService:
                     results.append(self.reviewed(result))
                     continue
             try:
+                if current_budget.get():
+                    current_budget.get().check()
                 result = SourceEvidenceResult.model_validate(adapter.fetch(movie.movie_id, link.external_id))
+                if current_budget.get():
+                    current_budget.get().check()
                 if result.movie_id != movie.movie_id or result.source != source:
                     raise ValueError("adapter result bound to wrong movie/source")
             except CatalogError as error:
@@ -93,8 +100,6 @@ class EvidenceService:
             ids = {item.evidence_id for item in permitted}
             result.ratings = [rating for rating in result.ratings if rating.evidence_id in ids]
             if result.status in {"ok", "no_results"}:
-                if current_budget.get():
-                    current_budget.get().check()
                 self.repository.cache_put(movie.movie_id, source, link.external_id, self.clock(), result.model_dump(mode="json"))
             elif cached:
                 result.cache_status = "stale"

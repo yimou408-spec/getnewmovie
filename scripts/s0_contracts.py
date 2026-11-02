@@ -1,5 +1,6 @@
 """Versioned S0 wire types; schema shared by mock API and experiment validation."""
 from typing import Literal
+import re
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
@@ -192,19 +193,24 @@ class Rating(StrictModel):
 
 
 class ExternalMovieIdentity(StrictModel):
-    provider: Literal["douban", "tmdb", "itunes"]
-    external_id: str = Field(pattern=r"^[1-9][0-9]*$")
+    provider: Literal["douban", "tmdb", "imdb", "itunes"]
+    external_id: str = Field(pattern=r"^(?:[1-9][0-9]*|tt[0-9]{7,})$")
     status: Literal["candidate", "confirmed"]
     url: HttpUrl
     basis: Literal["title_year", "human_verified", "provider_mapping", "multi_field_verified"]
 
     @model_validator(mode="after")
     def check_confirmation(self):
+        pattern = r"tt[0-9]{7,}" if self.provider == "imdb" else r"[1-9][0-9]*"
+        if not re.fullmatch(pattern, self.external_id):
+            raise ValueError("external identity ID must match its provider")
         if self.status == "confirmed" and self.basis == "title_year":
             raise ValueError("title/year match alone cannot confirm a cross-source identity")
         hosts = {"douban": {"movie.douban.com"}, "tmdb": {"www.themoviedb.org"},
+                 "imdb": {"www.imdb.com"},
                  "itunes": {"itunes.apple.com", "tv.apple.com"}}
-        paths = {"douban": f"/subject/{self.external_id}/", "tmdb": f"/movie/{self.external_id}"}
+        paths = {"douban": f"/subject/{self.external_id}/", "tmdb": f"/movie/{self.external_id}",
+                 "imdb": f"/title/{self.external_id}/"}
         if (self.url.scheme != "https" or self.url.host not in hosts[self.provider]
                 or self.url.username or self.url.password or self.url.query or self.url.fragment
                 or self.url.port not in {None, 443}):
@@ -325,6 +331,7 @@ class OpinionMatch(StrictModel):
 class OpinionSummary(StrictModel):
     status: Literal["insufficient", "single_group", "independence_unknown", "no_overlap", "compared"]
     synthetic: bool
+    comparison_scope: Literal["single_platform", "independent_sources"] = "independent_sources"
     extraction_method: Literal["controlled_phrases", "model_selected"] = "controlled_phrases"
     model_status: Literal["not_enabled", "ok", "invalid_output", "unavailable", "budget_exhausted"] = "not_enabled"
     independent_group_count: int = Field(ge=0, le=6)

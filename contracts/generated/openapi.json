@@ -1228,13 +1228,14 @@
             "enum": [
               "douban",
               "tmdb",
+              "imdb",
               "itunes"
             ],
             "title": "Provider"
           },
           "external_id": {
             "type": "string",
-            "pattern": "^[1-9][0-9]*$",
+            "pattern": "^(?:[1-9][0-9]*|tt[0-9]{7,})$",
             "title": "External Id"
           },
           "status": {
@@ -1936,6 +1937,15 @@
           "synthetic": {
             "type": "boolean",
             "title": "Synthetic"
+          },
+          "comparison_scope": {
+            "type": "string",
+            "enum": [
+              "single_platform",
+              "independent_sources"
+            ],
+            "title": "Comparison Scope",
+            "default": "independent_sources"
           },
           "extraction_method": {
             "type": "string",

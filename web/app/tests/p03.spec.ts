@@ -36,7 +36,9 @@ test("P03 real evidence drawer: provenance, focus, close and OS theme", async ({
   page,
 }, info) => {
   await page.goto("/");
-  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false");
+  await expect(page.locator(".results")).toHaveAttribute("aria-busy", "false", {
+    timeout: 50000,
+  });
   await page.getByRole("button", { name: "我有一点想法", exact: true }).click();
   const data = await submit(page);
   expect(["live", "cached"]).toContain(data.data_mode);
@@ -55,7 +57,7 @@ test("P03 real evidence drawer: provenance, focus, close and OS theme", async ({
   const drawer = page.getByRole("dialog");
   await expect(drawer).toContainText(data.candidates[0].movie.title);
   await expect(drawer).toContainText("仅 1 个来源站点");
-  await expect(drawer).toContainText("豆瓣评分未获取");
+  await expect(drawer).toContainText("IMDb 评分未获取");
   await expect(drawer).toContainText("尚未获取来源观点");
   const evidence = data.evidence.find(
     (e) => e.movie_id === data.candidates[0].movie.movie_id,

@@ -19,7 +19,7 @@ def main():
     backup.add_argument("--output", type=Path, required=True)
     mapping = sub.add_parser("map")
     mapping.add_argument("--movie-id", required=True)
-    mapping.add_argument("--provider", choices=["douban", "tmdb"], required=True)
+    mapping.add_argument("--provider", choices=["douban", "tmdb", "imdb"], required=True)
     mapping.add_argument("--external-id", required=True)
     mapping.add_argument("--basis", choices=["human_verified", "provider_mapping", "multi_field_verified"], required=True)
     mapping.add_argument("--confirmed", action="store_true")
@@ -39,7 +39,10 @@ def main():
         elif args.action == "map":
             if not args.confirmed:
                 parser.error("--confirmed requires independent identity verification")
-            url = f"https://movie.douban.com/subject/{args.external_id}/" if args.provider == "douban" else f"https://www.themoviedb.org/movie/{args.external_id}"
+            urls = {"douban": f"https://movie.douban.com/subject/{args.external_id}/",
+                    "tmdb": f"https://www.themoviedb.org/movie/{args.external_id}",
+                    "imdb": f"https://www.imdb.com/title/{args.external_id}/"}
+            url = urls[args.provider]
             repo.register_mapping(args.movie_id, ExternalMovieIdentity(provider=args.provider,
                 external_id=args.external_id, status="confirmed", basis=args.basis, url=url))
             print("Verified mapping registered; this does not establish evidence access or usage permission.")

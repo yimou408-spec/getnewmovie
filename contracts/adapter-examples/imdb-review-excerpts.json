@@ -1,0 +1,40 @@
+{
+  "movie_id": "itunes:101",
+  "source": "IMDb",
+  "status": "ok",
+  "evidence": [
+    {
+      "evidence_id": "offline-imdb-review-a",
+      "movie_id": "itunes:101",
+      "source": "IMDb",
+      "url": "https://www.imdb.com/review/rw0000001/",
+      "retrieved_at": "2026-11-01T00:00:00Z",
+      "kind": "review",
+      "granularity": "excerpt",
+      "claim": "Synthetic offline review A: slow-paced, light-hearted. This is not an actual IMDb review.",
+      "author": "Invented author A",
+      "source_content_id": "rw0000001",
+      "spoiler_level": "safe",
+      "usage_basis": "synthetic",
+      "independent_source_group": null
+    },
+    {
+      "evidence_id": "offline-imdb-review-b",
+      "movie_id": "itunes:101",
+      "source": "IMDb",
+      "url": "https://www.imdb.com/review/rw0000002/",
+      "retrieved_at": "2026-11-01T00:00:00Z",
+      "kind": "review",
+      "granularity": "excerpt",
+      "claim": "Synthetic offline review B: fast-paced, light-hearted. This is not an actual IMDb review.",
+      "author": "Invented author B",
+      "source_content_id": "rw0000002",
+      "spoiler_level": "safe",
+      "usage_basis": "synthetic",
+      "independent_source_group": null
+    }
+  ],
+  "ratings": [],
+  "cache_status": "none",
+  "warnings": ["Synthetic offline fixture only. Placeholder review IDs are not verified IMDb records. No live IMDb adapter is enabled."]
+}

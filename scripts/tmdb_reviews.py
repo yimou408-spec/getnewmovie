@@ -16,6 +16,7 @@ from scripts.tmdb_adapter import metadata_text
 
 class TMDBReviewSource:
     source = "TMDB Reviews"
+    provides_reviews = True
     identity_provider = "tmdb"
 
     def __init__(self, token, *, client=None):

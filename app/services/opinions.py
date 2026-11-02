@@ -6,6 +6,7 @@ and spoiler clearance must be supplied upstream, never inferred by a model.
 import re
 import unicodedata
 from itertools import islice
+from urllib.parse import urlsplit
 import httpx
 
 from app.services.budget import current_budget
@@ -30,6 +31,12 @@ NEGATION = re.compile(r"不|无|没|并非|不是|未必|难说|不能|忽略|�
 BASE_LIMIT = "仅对取得的材料片段作对照，不代表全网口碑；片段以外、引用支持程度及剧透仍需人工抽审。"
 
 
+def imdb_review_bound(entry):
+    record_id = entry.source_content_id or ""
+    return (bool(re.fullmatch(r"rw[0-9]{7,}", record_id))
+            and str(entry.url) == f"https://www.imdb.com/review/{record_id}/")
+
+
 def eligible(movie_id, results):
     entries, seen_ids, seen_text = [], set(), set()
     for source in results:
@@ -40,6 +47,7 @@ def eligible(movie_id, results):
             if (e.movie_id != movie_id or e.source != source.source or e.evidence_id in seen_ids
                     or e.kind != "review" or e.granularity not in {"excerpt", "full_text"}
                     or e.spoiler_level != "safe" or e.usage_basis not in {"licensed", "provider_terms", "synthetic"}
+                    or (e.source == "IMDb" and not imdb_review_bound(e))
                     or not e.author or not key or key in seen_text):
                 continue
             entries.append(e)
@@ -75,22 +83,42 @@ def compose(opinions, entries, constraints):
     opinions = sorted(opinions, key=lambda p: (p.evidence_id, p.aspect, p.value, p.quote))
     groups = {by_id[p.evidence_id].independent_source_group for p in opinions
               if by_id[p.evidence_id].independent_source_group}
+    platforms = {(by_id[p.evidence_id].source, urlsplit(str(by_id[p.evidence_id].url)).hostname)
+                 for p in opinions}
+    scope = ("single_platform" if len(platforms) == 1 and
+             next(iter(platforms))[0] == "IMDb" else "independent_sources")
     comparisons = []
     for aspect in ASPECTS:
-        selected = [p for p in opinions if p.aspect == aspect and by_id[p.evidence_id].independent_source_group]
-        group_values = {}
-        for p in selected:
-            group_values.setdefault(by_id[p.evidence_id].independent_source_group, set()).add(p.value)
-        selected = [p for p in selected if len(group_values[by_id[p.evidence_id].independent_source_group]) == 1]
-        if len({by_id[p.evidence_id].independent_source_group for p in selected}) < 2:
-            continue
+        if scope == "single_platform":
+            # Compare this sample only. Author handles are grouping keys, never
+            # proof of distinct people, originality or independent publishers.
+            selected = [p for p in opinions if p.aspect == aspect and by_id[p.evidence_id].source_content_id]
+            content_ids = [e.source_content_id for e in entries if e.source_content_id]
+            selected = [p for p in selected if content_ids.count(by_id[p.evidence_id].source_content_id) == 1]
+            def author_key(p):
+                return unicodedata.normalize("NFKC", by_id[p.evidence_id].author).strip().casefold()
+            author_values = {}
+            for p in selected:
+                author_values.setdefault(author_key(p), set()).add(p.value)
+            selected = [p for p in selected if author_key(p) and len(author_values[author_key(p)]) == 1]
+            if len({author_key(p) for p in selected}) < 2:
+                continue
+        else:
+            selected = [p for p in opinions if p.aspect == aspect and by_id[p.evidence_id].independent_source_group]
+            group_values = {}
+            for p in selected:
+                group_values.setdefault(by_id[p.evidence_id].independent_source_group, set()).add(p.value)
+            selected = [p for p in selected if len(group_values[by_id[p.evidence_id].independent_source_group]) == 1]
+            if len({by_id[p.evidence_id].independent_source_group for p in selected}) < 2:
+                continue
         values = sorted({p.value for p in selected})
         refs = sorted({p.evidence_id for p in selected})
+        label = f"本次{next(iter(platforms))[0]}站内材料" if scope == "single_platform" else "本次独立材料"
         if len(values) == 1:
-            text = f"本次独立材料在{ASPECTS[aspect]}上的描述一致：{VALUES[values[0]]}。"
+            text = f"{label}在{ASPECTS[aspect]}上的描述一致：{VALUES[values[0]]}。"
             kind = "agreement"
         else:
-            text = f"本次独立材料对{ASPECTS[aspect]}的描述不同：{' / '.join(VALUES[v] for v in values)}。"
+            text = f"{label}对{ASPECTS[aspect]}的描述不同：{' / '.join(VALUES[v] for v in values)}。"
             kind = "disagreement"
         comparisons.append(OpinionComparison(aspect=aspect, kind=kind, text=text, evidence_ids=refs))
     matches, cautions = [], []
@@ -106,14 +134,17 @@ def compose(opinions, entries, constraints):
               "independence_unknown" if not groups or any(not by_id[p.evidence_id].independent_source_group for p in opinions) else
               "single_group" if len(groups) == 1 else "no_overlap")
     limitations = [BASE_LIMIT]
+    if scope == "single_platform":
+        limitations.append("单一平台的有限影评样本；不同作者账号不证明来源独立，不代表跨平台核验或平台整体共识。")
     if status != "compared":
-        limitations.append({"insufficient": "缺少可安全引用并识别的评价观点。", "independence_unknown": "来源独立性尚未全部核验，不能认定跨源共识。",
+        limitations.append("本站可用材料不足或缺少同主题对照，未生成一致或分歧结论。" if scope == "single_platform" else
+                           {"insufficient": "缺少可安全引用并识别的评价观点。", "independence_unknown": "来源独立性尚未全部核验，不能认定跨源共识。",
                             "single_group": "仅一个已核验独立来源组，转载和相同正文不增加来源数。",
                             "no_overlap": "独立材料没有可对照的相同主题，未强行生成共识或分歧。"}[status])
     synthetic = any(by_id[p.evidence_id].usage_basis == "synthetic" for p in opinions)
     if synthetic:
         limitations.append("含离线合成材料，仅用于开发验收，不代表真实多源评价通过。")
-    return OpinionSummary(status=status, synthetic=synthetic, independent_group_count=len(groups),
+    return OpinionSummary(status=status, synthetic=synthetic, comparison_scope=scope, independent_group_count=len(groups),
                           opinions=opinions, comparisons=comparisons, matches=matches, cautions=cautions, limitations=limitations)
 
 
@@ -129,7 +160,7 @@ def validate_synthesis(summary, movie_id, evidence, constraints=None, source_res
     if len(keys) != len(set(keys)) or any(key not in allowed for key in keys):
         raise ValueError("opinion requires same-movie safe licensed verbatim support")
     expected = compose(summary.opinions, entries, constraints or Constraints())
-    for field in ("status", "synthetic", "independent_group_count", "opinions", "comparisons", "matches", "cautions", "limitations"):
+    for field in ("status", "synthetic", "comparison_scope", "independent_group_count", "opinions", "comparisons", "matches", "cautions", "limitations"):
         if getattr(summary, field) != getattr(expected, field):
             raise ValueError("opinion synthesis must match supported deterministic output: " + field)
 
@@ -147,6 +178,8 @@ class OpinionPipeline:
         if initial.status != "compared":
             if not initial.opinions:
                 followup = "safety_review_needed" if any(e.kind == "review" for r in results for e in r.evidence) else "source_unavailable"
+            elif initial.comparison_scope == "single_platform":
+                followup = "not_needed"
             elif self.supplement is None:
                 followup = "not_configured"
             elif self.followup_used:

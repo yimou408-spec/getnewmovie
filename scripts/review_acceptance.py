@@ -37,7 +37,7 @@ def run_probe(ids, source, audit=None):
         sample_count=len(ids), requests_made=budget.http_calls, results=rows,
         acquired_review_count=sum(r['acquired_review_count'] for r in rows),
         human_signoff=False, multi_source_acceptance_passed=False,
-        limitations=['TMDB acquisition only; no automatic Douban or second-platform verification.',
+        limitations=['Legacy TMDB acquisition only; does not validate the current IMDb review target.',
                      'Different authors do not establish independent publishers.',
                      'An audit file records reviewer assertions; it does not verify them automatically.',
                      'No Apple mapping, production cache update, model calls or preference changes.'])

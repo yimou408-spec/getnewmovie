@@ -1,6 +1,35 @@
 {
   "title": "2026-10-20至10-31三人开发任务台账",
   "timezone": "Asia/Shanghai",
+  "current_scope": {
+    "effective_date": "2026-11-01",
+    "decision_basis": "User requested IMDb-only reviews and removal of the Douban dependency.",
+    "catalog_providers": ["apple", "tmdb"],
+    "target_review_provider": "imdb",
+    "comparison_scope": "single_platform",
+    "removed_required_gates": ["automatic_douban_reviews", "second_independent_review_platform", "cross_platform_consensus"],
+    "removed_gates_passed": false,
+    "live_imdb_adapter_enabled": false,
+    "review_text_access": "blocked_pending_licensed_individual_review_product_confirmation",
+    "last_attempt_on": "2026-11-02",
+    "blockers": [
+      {"id": "I01", "reason": "No verified licensed individual IMDb review text product; public summaries lack per-review provenance.", "requires": "Provider product documentation, permitted processing/display/retention and price."},
+      {"id": "M12", "reason": "Another physical computer and actual member signoff required after final merge.", "requires": "Member-run final SHA, environment, startup/persistence/deletion results and signed record."}
+    ],
+    "local_evidence": {"mvp_live": "artifacts/imdb-closure/mvp-live-20261102.json", "mvp_live_passed": true, "model_requests": 4, "production_smoke": "artifacts/imdb-closure/production-live-20261102.json", "legacy_tmdb_initial_attempt_failed": true, "independent_agent_review": "Binding and source-status issues identified and corrected; human signoff still pending."},
+    "free_imdb_datasets_include_review_text": false,
+    "historical_tasks_policy": "Original tasks, hours, dates and signoffs below remain historical snapshots; this scope supersedes their mandatory Douban and second-platform requirements without marking them done.",
+    "plan": "docs/限期开发实施计划_20261029.md#当前执行计划2026-11-01-imdb-单平台影评调整",
+    "interface": "docs/MVP最小接口约定.md#imdb单平台影评接口2026-11-01",
+    "current_tasks": [
+      {"id": "I01", "title": "Verify IMDb review product, access, permitted processing and cost", "status": "blocked_provider_confirmation", "depends_on": [], "attempted_on": "2026-11-02"},
+      {"id": "I02", "title": "IMDb identity and evidence contracts", "status": "offline_checks_passed", "depends_on": []},
+      {"id": "I03", "title": "Implement bounded IMDb review adapter and failure recovery", "status": "not_started", "depends_on": ["I01", "I02"], "note": "Real adapter waits for I01; shared optional-phase deadline and explicit capabilities implemented and offline tested."},
+      {"id": "I04", "title": "Scoped sample opinion comparisons and citations", "status": "offline_checks_passed", "depends_on": ["I02"]},
+      {"id": "I05", "title": "Real IMDb ten-film coverage and recommendation acceptance", "status": "not_started", "depends_on": ["I01", "I02", "I03", "I04"], "sample_count_target": 10, "minimum_usable_reviews_per_film": 2, "include_recent_90_day_title": true, "failures_remain_in_denominator": true},
+      {"id": "I06", "title": "Human citation/spoiler review, C08 comparison, user trial, frozen-version CI and M12 another-computer signoff", "status": "pending", "depends_on": ["I05"]}
+    ]
+  },
   "target_delivery": "2026-10-29",
   "hard_deadline": "2026-10-31",
   "repositories": {

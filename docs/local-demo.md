@@ -48,11 +48,10 @@
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.movie_demo --check
-.venv\Scripts\python.exe -m scripts.s0_probe_tmdb --live
-.venv\Scripts\python.exe -m scripts.s0_probe_model --live
+.venv\Scripts\python.exe -m scripts.mvp_probe_model --live --case E02 --max-requests 1
 ```
 
-第一条只打印脱敏状态；后两条显式联网，模型探测会调用服务商。探测结果写入忽略的 `artifacts/`。探测通过后，仍需在网页实际提交文字、核对识别条件和影片来源。“已填写 · 待联网验证”不是联网验收结果。
+第一条只打印脱敏状态；第二条读取根目录`.env`或进程变量，显式调用一次云模型，可能计费，结果写入忽略的`artifacts/`。旧`s0_probe_*`仅读取进程变量，不会自动加载`.env`。探测通过后，仍需在网页实际提交文字、核对识别条件和影片来源。“已填写 · 待联网验证”不是联网验收结果。
 
 ## 常见故障
 
@@ -88,6 +87,10 @@ git rev-parse HEAD
 若已有旧副本且工作区没有未保存改动，可运行 `git switch main`、`git pull --ff-only origin main` 再启动；有本地改动时保留原副本，另建目录下载，避免覆盖。ZIP 下载者保留本次下载链接和 GitHub 页面显示的提交哈希。
 
 ## 口碑综合开发分支
+
+2026-11-01最新调整：当前改为IMDb单平台影评目标，豆瓣/第二平台不再是验收前置。IMDb没有已启用的生产采集适配器；默认来源状态为`IMDb/not_configured`，注册IMDb影片映射不会发起HTTP或让`reviews`能力变成true。现有TMDB可选影评仅作为历史可用通路保留，不自动改标签或计作IMDb成功。先按[当前计划](限期开发实施计划_20261029.md#当前执行计划2026-11-01-imdb-单平台影评调整)核对正文产品、使用范围与字段，不要填一个假定存在的`IMDB_API_KEY`。
+
+已实现`comparison_scope=single_platform`的站内材料对照及IMDb映射命令，详情和合成例子见[接口约定](MVP最小接口约定.md#imdb单平台影评接口2026-11-01)。不同作者账号不充当独立来源，也不代表全平台共识。真实素材及10片验收仍待完成；下方TMDB探测/审核操作保留，旧“豆瓣未通过”不再阻断当前交付。
 
 `feat/evidence-opinion-synthesis` 新增来源面板的材料观点对照，范围和离线验收见[MVP最新记录](MVP开发工作记录.md#2026-11-01--口碑综合最小实现离线证据验收)。默认只处理已标记安全、可使用的影评受控短语；材料不足/独立性未知就明确降级。当前真实TMDB摘录为剧透未知、无独立组，豆瓣仍无可用评价，不会因此出现“真实多源已核验”。
 

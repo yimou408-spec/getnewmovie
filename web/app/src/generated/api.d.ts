@@ -414,7 +414,7 @@ export interface components {
        * Provider
        * @enum {string}
        */
-      provider: "douban" | "tmdb" | "itunes";
+      provider: "douban" | "tmdb" | "imdb" | "itunes";
       /** External Id */
       external_id: string;
       /**
@@ -671,6 +671,12 @@ export interface components {
         | "compared";
       /** Synthetic */
       synthetic: boolean;
+      /**
+       * Comparison Scope
+       * @default independent_sources
+       * @enum {string}
+       */
+      comparison_scope: "single_platform" | "independent_sources";
       /**
        * Extraction Method
        * @default controlled_phrases

@@ -258,7 +258,14 @@ export function OpinionSynthesis({
   return (
     <section className="evidence-reason" aria-label="材料观点对照">
       <h3>材料观点对照</h3>
-      <p>{states[summary.status]}</p>
+      <p>
+        {summary.status === "compared" &&
+        summary.comparison_scope === "single_platform"
+          ? "本站影评样本可对照"
+          : summary.comparison_scope === "single_platform"
+            ? "本站影评样本不足以对照"
+            : states[summary.status]}
+      </p>
       {summary.synthetic && (
         <p className="notice warning">含离线合成材料，仅供开发验收。</p>
       )}
@@ -340,7 +347,7 @@ export function EvidenceOverview({
 }) {
   const entries = evidenceForMovie(movie, evidence);
   const sites = sourceSites(entries);
-  const doubanRating = movie.ratings?.some((r) => r.source.includes("豆瓣"));
+  const imdbRating = movie.ratings?.some((r) => r.source === "IMDb");
   return (
     <div className="evidence-overview">
       {dataMode === "synthetic" && (
@@ -361,7 +368,7 @@ export function EvidenceOverview({
               : `${sites.length} 个来源站点；来源独立性尚未核验。`}
         </strong>
         <p>同一站点的多条资料不会计作多个来源，评分按原平台和量表分别展示。</p>
-        {!doubanRating && <p>豆瓣评分未获取；不代表评分低或影片未收录。</p>}
+        {!imdbRating && <p>IMDb 评分未获取；不代表评分低或影片未收录。</p>}
       </div>
       {candidate && (
         <section className="evidence-reason">
