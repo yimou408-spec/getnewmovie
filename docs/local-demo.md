@@ -69,13 +69,14 @@
 
 ## 本轮完整分支复现与签收
 
-本轮完整代码已合入 `main`，包含一键启动、持久化、TMDB 资料/可选影评和模型冲突修复；`feat/backend-persistence-evidence` 保留整合开发记录。队友请从 GitHub 选择 `main` 后使用 Code → Download ZIP，完整解压再运行；也可使用 Git：
+本轮完整代码已通过[PR #10](https://github.com/yimou408-spec/getnewmovie/pull/10)合入`main`，包含一键启动、持久化、TMDB资料/可选影评、模型冲突修复、观点引用及IMDb单平台接口。真实IMDb采集仍未配置。队友可从GitHub选择`main`后下载ZIP，或使用下方固定版本；完整解压再运行。
 
-已完成云端验证的业务版本为 `7da4adf9af4e298a8d1cfef07bfd8650eb772393`：[固定版本ZIP](https://github.com/yimou408-spec/getnewmovie/archive/7da4adf9af4e298a8d1cfef07bfd8650eb772393.zip)。该版本后端离线检查、前端类型/单测/构建/格式及244项浏览器验收通过；8项需专用模型/故障环境的浏览器检查未在CI运行。后续仅补文档时可以使用最新 `main`，请保留实际版本记录。
+当前成员签收候选版本固定为`be278eba1b3db18006a9e317299ac4990e7b5d06`：[固定版本ZIP](https://github.com/yimou408-spec/getnewmovie/archive/be278eba1b3db18006a9e317299ac4990e7b5d06.zip)。业务提交`2f4607a`的云端后端门禁、前端53项单测及252项浏览器通过，8项专用本机模型/故障环境跳过；此后的两次提交仅补文档和未运行的评估协议。合并SHA的CI以其Actions实际状态为准，不将前一SHA结果冒充合并重验。下方命令切到固定合并SHA；成员必须记录实际下载SHA。
 
 ```powershell
 git clone --branch main https://github.com/yimou408-spec/getnewmovie.git
 cd getnewmovie
+git switch --detach be278eba1b3db18006a9e317299ac4990e7b5d06
 git rev-parse HEAD
 .\start-demo.cmd
 ```
